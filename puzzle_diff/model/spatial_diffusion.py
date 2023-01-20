@@ -381,7 +381,11 @@ class GNN_Diffusion(pl.LightningModule):
         if batch_idx % self.save_and_sample_every == 0 and self.local_rank == 0:
             imgs = self.p_sample_loop(batch.x.shape, batch.patches, batch.edge_index)
             img = imgs[-1]
-            for i in range(4):
+            save_path = Path(f"results/{self.logger.experiment.name}/")
+            save_path.mkdir(parents=True, exist_ok=True)
+            for i in range(
+                min(batch.batch.max().item(), 4)
+            ):  # save max 4 images during training loop
                 fig, ax = plt.subplots(2, 2)
                 idx = torch.where(batch.batch == i)[0]
                 patches_rgb = batch.patches[idx]
@@ -402,6 +406,7 @@ class GNN_Diffusion(pl.LightningModule):
                 ax[1, 1].scatter(pos[:, 0].cpu(), pos[:, 1].cpu())
                 ax[1, 1].set_aspect("equal")
                 ax[0, 0].set_title(f"{self.current_epoch}-{batch.ind_name[i]}")
+                ax[0, 1].set_title(f"{batch.patches_dim[i]}")
 
                 fig.canvas.draw()
                 im = PIL.Image.frombytes(
@@ -412,11 +417,59 @@ class GNN_Diffusion(pl.LightningModule):
                     {"image": im, "global_step": self.global_step + i}
                 )
 
-                plt.savefig(f"results/asd_{self.current_epoch}-{batch.ind_name[i]}.png")
+                plt.savefig(
+                    f"{save_path}/asd_{self.current_epoch}-{batch.ind_name[i]}.png"
+                )
                 plt.close()
         self.log("loss", loss)
 
         return loss
+
+    def validation_step(self, batch, batch_idx):
+        if self.local_rank > 0:
+            return
+
+        imgs = self.p_sample_loop(batch.x.shape, batch.patches, batch.edge_index)
+        img = imgs[-1]
+        save_path = Path(f"results/{self.logger.experiment.name}/val")
+        save_path.mkdir(parents=True, exist_ok=True)
+        for i in range(
+            min(batch.batch.max().item(), 4)
+        ):  # save max 4 images during training loop
+            fig, ax = plt.subplots(2, 2)
+            idx = torch.where(batch.batch == i)[0]
+            patches_rgb = batch.patches[idx]
+            gt_pos = batch.x[idx]
+            pos = img[idx]
+            gt_img = self.create_image_from_patches(
+                patches_rgb, gt_pos, n_patches=batch.patches_dim[i], i=i
+            )
+
+            pred_img = self.create_image_from_patches(
+                patches_rgb, pos, n_patches=batch.patches_dim[i], i=i
+            )
+            ax[0, 0].imshow(gt_img)
+            ax[0, 1].imshow(pred_img)
+            ax[1, 0].scatter(gt_pos[:, 0].cpu(), gt_pos[:, 1].cpu())
+            ax[1, 0].set_aspect("equal")
+
+            ax[1, 1].scatter(pos[:, 0].cpu(), pos[:, 1].cpu())
+            ax[1, 1].set_aspect("equal")
+            ax[0, 0].set_title(f"{self.current_epoch}-{batch.ind_name[i]}")
+
+            ax[0, 1].set_title(f"{batch.patches_dim[i]}")
+
+            fig.canvas.draw()
+            im = PIL.Image.frombytes(
+                "RGB", fig.canvas.get_width_height(), fig.canvas.tostring_rgb()
+            )
+            im = wandb.Image(im)
+            self.logger.experiment.log(
+                {"val_image": im, "global_step": self.global_step + i}
+            )
+
+            plt.savefig(f"{save_path}/asd_{self.current_epoch}-{batch.ind_name[i]}.png")
+            plt.close()
 
     def create_image_from_patches(self, patches, pos, n_patches=(4, 4), i=0):
 
@@ -572,7 +625,7 @@ class GNN_Diffusion(pl.LightningModule):
         if self.local_rank == 0:
 
             logger = self.logger.experiment
-            accuracy = self.correct / self.num_images
+            accuracy = self.correct / (self.num_images + 1e-3)
             print(f"Ep:{self.current_epoch:3d} - accuracy: {accuracy:0.4f}")
             logger.log({"accuracy": accuracy, "epoch": self.current_epoch})
         # return super().on_test_epoch_end()
@@ -756,8 +809,8 @@ class GNN_Diffusion(pl.LightningModule):
     def on_validation_epoch_end(self) -> None:
         self.on_test_epoch_end()
 
-    def validation_step(self, batch, batch_idx, *args, **kwargs):
-        return self.test_step(batch, batch_idx, *args, **kwargs)
+    # def validation_step(self, batch, batch_idx, *args, **kwargs):
+    # return self.test_step(batch, batch_idx, *args, **kwargs)
 
 
 def img_to_patches(t, patches_per_dim):

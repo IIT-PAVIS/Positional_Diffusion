@@ -35,11 +35,15 @@ def main(batch_size, gpus, steps):
     )
 
     puzzleDt_train = Puzzle_Dataset(
-        dataset=celebA_tr, dataset_get_fn=celeba_get_fn, patch_per_dim=(7, 4)
+        dataset=celebA_tr,
+        dataset_get_fn=celeba_get_fn,
+        patch_per_dim=[(4, 4), (6, 6), (8, 8)],
     )
 
     puzzleDt_test = Puzzle_Dataset(
-        dataset=celebA_test, dataset_get_fn=celeba_get_fn, patch_per_dim=(7, 4)
+        dataset=celebA_test,
+        dataset_get_fn=celeba_get_fn,
+        patch_per_dim=[(4, 4), (5, 5), (6, 6), (7, 7), (8, 8)],
     )
 
     dl_train = torch_geometric.loader.DataLoader(
@@ -69,7 +73,7 @@ def main(batch_size, gpus, steps):
         logger=wandb_logger,
         # callbacks=[checkpoint_callback]
     )
-    trainer.fit(model, dl_train)
+    trainer.fit(model, dl_train, dl_test)
 
     pass
 
@@ -78,8 +82,9 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
 
     # Add the arguments to the parser
-    ap.add_argument("-batch_size", type=int, default=32)
+    ap.add_argument("-batch_size", type=int, default=6)
     ap.add_argument("-gpus", type=int, default=1)
     ap.add_argument("-steps", type=int, default=600)
+
     args = ap.parse_args()
     main(batch_size=args.batch_size, gpus=args.gpus, steps=args.steps)

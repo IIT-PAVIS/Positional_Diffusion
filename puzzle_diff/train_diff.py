@@ -64,7 +64,7 @@ def main(batch_size, gpus, steps):
     trainer = pl.Trainer(
         accelerator="gpu",
         devices=gpus,
-        # strategy="ddp",
+        strategy="ddp",
         limit_val_batches=10,
         logger=wandb_logger,
         # callbacks=[checkpoint_callback]

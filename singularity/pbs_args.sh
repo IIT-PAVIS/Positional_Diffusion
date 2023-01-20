@@ -25,4 +25,4 @@ module load cuda/11.6
 echo "$pyfile"
 
 # singularity exec -B /work/fgiuliari/Pointnet_Scannet -B /work/fgiuliari/Scannet-bbox:/work/fgiuliari/Pointnet_Scannet/Scannet --nv env.sif python train_pointnet.py --batch_size 20
-singularity run --nv -B ./:/app singularity/singularity.sif bash /app/singularity/run_Script_args.sh $pyfile "$args" #$1
+singularity run --nv -B ./:/app singularity/diffPYG.sif bash /app/singularity/run_Script_args.sh $pyfile "$args" #$1

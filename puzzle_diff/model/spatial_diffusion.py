@@ -380,7 +380,7 @@ class GNN_Diffusion(pl.LightningModule):
         )
         if batch_idx % self.save_and_sample_every == 0 and self.local_rank == 0:
             imgs = self.p_sample_loop(batch.x.shape, batch.patches, batch.edge_index)
-            img = imgs[0]
+            img = imgs[-1]
             for i in range(4):
                 fig, ax = plt.subplots(2, 2)
                 idx = torch.where(batch.batch == i)[0]

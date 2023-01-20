@@ -35,11 +35,11 @@ def main(batch_size, gpus, steps):
     )
 
     puzzleDt_train = Puzzle_Dataset(
-        dataset=celebA_tr, dataset_get_fn=celeba_get_fn, patch_per_dim=(4, 4)
+        dataset=celebA_tr, dataset_get_fn=celeba_get_fn, patch_per_dim=(7, 4)
     )
 
     puzzleDt_test = Puzzle_Dataset(
-        dataset=celebA_test, dataset_get_fn=celeba_get_fn, patch_per_dim=(4, 4)
+        dataset=celebA_test, dataset_get_fn=celeba_get_fn, patch_per_dim=(7, 4)
     )
 
     dl_train = torch_geometric.loader.DataLoader(

@@ -1,0 +1,15 @@
+lightning_logs/
+results/
+Puzzle-Diff/
+/dataset/
+/datasets/
+.vscode/
+wandb/
+
+*.png
+*.ckpt
+*.sif
+*.pyc
+
+Mambaforge-Linux-x86_64.sh
+

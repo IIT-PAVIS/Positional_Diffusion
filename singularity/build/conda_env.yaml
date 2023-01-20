@@ -1,0 +1,21 @@
+name: diffPYG
+channels:
+  - pytorch
+  - conda-forge
+  - pyg
+  - nvidia
+  - defaults
+
+dependencies:
+  - pytorch==1.12.1
+  - cudatoolkit<=11.3.10
+  - pyg
+  - einops
+  - black
+  - pre-commit
+  - pytorch-lightning
+  - pip
+  - matplotlib
+  - wandb
+  - transformers
+  - timm

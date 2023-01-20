@@ -1,0 +1,27 @@
+# -----------------------------------------------------------------------------------
+BootStrap: docker
+From: nvidia/cuda:10.2-cudnn8-devel-ubuntu18.04
+
+# -----------------------------------------------------------------------------------
+%environment
+    export LD_LIBRARY_PATH=/usr/local/cuda-10.2/lib64:$LD_LIBRARY_PATH
+    export LC_ALL=C
+    export CC=cc
+
+# -----------------------------------------------------------------------------------
+%files
+Mambaforge-Linux-x86_64.sh /opt/conda.sh
+conda_env.yaml /opt/conda_env.yaml
+
+
+# -----------------------------------------------------------------------------------
+%post -c /bin/bash
+apt-get update
+sh /opt/conda.sh -b -p /opt/conda
+source /opt/conda/bin/activate
+conda init
+rm /opt/conda.sh
+apt install vim -y
+conda update mamba -y
+
+mamba env create -n SCG_OL --file /opt/conda_env.yaml

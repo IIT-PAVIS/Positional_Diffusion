@@ -16,9 +16,9 @@
 #PBS -q gpu
 
 
-cd /work/fgiuliari/Puzzle-Diffusion
+cd /work/fgiuliari/PuzzleDiffusion-GNN
 # Run the program.
-module load cuda/10.2
+module load cuda/11.6
 #module load openmpi/4.0.5/gcc7-ib
 
 

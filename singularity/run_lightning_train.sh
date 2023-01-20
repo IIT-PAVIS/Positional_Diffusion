@@ -1,9 +1,9 @@
 #!/bin/bash
-cd /work/fgiuliari/Puzzle-Diffusion/singularity
+cd /work/fgiuliari/PuzzleDiffusion-GNN/singularity
 
-NAME='Diff'
+NAME='Diff-GNN'
 ARGS='-gpus 4 -batch_size 32 -steps 600'
 
 
-qsub -v pyfile=lightning_main.py,args="$ARGS" -N "$NAME"  pbs_args.sh
+qsub -v pyfile=puzzle_diff/train_diff.py,args="$ARGS" -N "$NAME"  pbs_args.sh
 

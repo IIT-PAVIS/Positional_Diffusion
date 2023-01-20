@@ -13,7 +13,7 @@ dependencies:
   - einops
   - black
   - pre-commit
-  - pytorch-lightning
+  - pytorch-lightning<1.8
   - pip
   - matplotlib
   - wandb

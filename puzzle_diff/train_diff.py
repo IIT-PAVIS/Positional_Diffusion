@@ -53,7 +53,7 @@ def main(batch_size, gpus, steps):
         puzzleDt_test, batch_size=batch_size, num_workers=8, shuffle=False
     )
 
-    dl_train = dl_test  # TODO <----------------- CHANGE to train once debugging
+    # dl_train = dl_test  # TODO <----------------- CHANGE to train once debugging
 
     save_and_sample_every = 20000  # math.floor(len(dl_train) / gpus / 4)
 

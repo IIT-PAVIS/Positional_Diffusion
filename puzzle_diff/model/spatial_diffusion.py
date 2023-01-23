@@ -450,9 +450,10 @@ class GNN_Diffusion(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
+
+        imgs = self.p_sample_loop(batch.x.shape, batch.patches, batch.edge_index)
+        img = imgs[-1]
         if self.local_rank == 0 and batch_idx < 5:
-            imgs = self.p_sample_loop(batch.x.shape, batch.patches, batch.edge_index)
-            img = imgs[-1]
             save_path = Path(f"results/{self.logger.experiment.name}/val")
             for i in range(
                 min(batch.batch.max().item(), 4)

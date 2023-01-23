@@ -3,6 +3,7 @@ results/
 Puzzle-Diff/
 /dataset/
 /datasets/
+dataset_old_delete/
 .vscode/
 wandb/
 
@@ -12,4 +13,5 @@ wandb/
 *.pyc
 
 Mambaforge-Linux-x86_64.sh
+*.zip
 

@@ -5,6 +5,7 @@ import scipy
 from functools import partial
 from transformers.optimization import Adafactor
 from .Transformer_GNN import Transformer_GNN
+from collections import defaultdict
 
 # from .network_modules import (
 #     default,
@@ -87,6 +88,49 @@ def extract(a, t, x_shape):
     batch_size = t.shape[0]
     out = a.gather(-1, t.cpu())
     return out.reshape(batch_size, *((1,) * (len(x_shape) - 1))).to(t.device)
+
+
+import torch
+
+
+@torch.jit.script
+def greedy_cost_assignment(pos1: torch.Tensor, pos2: torch.Tensor) -> torch.Tensor:
+    # Compute pairwise distances between positions
+    dist = torch.norm(pos1[:, None] - pos2, dim=2)
+
+    # Create a tensor to store the assignments
+    assignments = torch.zeros(dist.size(0), 3, dtype=torch.int64)
+
+    # Create a mask to keep track of assigned positions
+    mask = torch.ones_like(dist, dtype=torch.uint8)
+
+    # Counter for keeping track of the number of assignments
+    counter = 0
+
+    # While there are still unassigned positions
+    while mask.sum() > 0:
+        # Find the minimum distance
+        min_val, min_idx = dist[mask].min(dim=0)
+
+        # Get the indices of the two dimensions
+        idx = int(min_idx.item())
+        ret = mask.nonzero()[idx, :]
+        i = ret[0]
+        j = ret[1]
+
+        # Add the assignment to the tensor
+        assignments[counter, 0] = i
+        assignments[counter, 1] = j
+        assignments[counter, 2] = min_val
+
+        # Increase the counter
+        counter += 1
+
+        # Remove the assigned positions from the distance matrix and the mask
+        mask[i, :] = 0
+        mask[:, j] = 0
+
+    return assignments[:counter]
 
 
 class GNN_Diffusion(pl.LightningModule):
@@ -381,8 +425,8 @@ class GNN_Diffusion(pl.LightningModule):
         if batch_idx % self.save_and_sample_every == 0 and self.local_rank == 0:
             imgs = self.p_sample_loop(batch.x.shape, batch.patches, batch.edge_index)
             img = imgs[-1]
-            save_path = Path(f"results/{self.logger.experiment.name}/")
-            save_path.mkdir(parents=True, exist_ok=True)
+
+            save_path = Path(f"results/{self.logger.experiment.name}/train")
             for i in range(
                 min(batch.batch.max().item(), 4)
             ):  # save max 4 images during training loop
@@ -391,85 +435,96 @@ class GNN_Diffusion(pl.LightningModule):
                 patches_rgb = batch.patches[idx]
                 gt_pos = batch.x[idx]
                 pos = img[idx]
-                gt_img = self.create_image_from_patches(
-                    patches_rgb, gt_pos, n_patches=batch.patches_dim[i], i=i
+                n_patches = batch.patches_dim[i]
+                i_name = batch.ind_name[i]
+                self.save_image(
+                    patches_rgb=patches_rgb,
+                    pos=pos,
+                    gt_pos=gt_pos,
+                    patches_dim=n_patches,
+                    ind_name=i_name,
+                    file_name=save_path,
                 )
-
-                pred_img = self.create_image_from_patches(
-                    patches_rgb, pos, n_patches=batch.patches_dim[i], i=i
-                )
-                ax[0, 0].imshow(gt_img)
-                ax[0, 1].imshow(pred_img)
-                ax[1, 0].scatter(gt_pos[:, 0].cpu(), gt_pos[:, 1].cpu())
-                ax[1, 0].set_aspect("equal")
-
-                ax[1, 1].scatter(pos[:, 0].cpu(), pos[:, 1].cpu())
-                ax[1, 1].set_aspect("equal")
-                ax[0, 0].set_title(f"{self.current_epoch}-{batch.ind_name[i]}")
-                ax[0, 1].set_title(f"{batch.patches_dim[i]}")
-
-                fig.canvas.draw()
-                im = PIL.Image.frombytes(
-                    "RGB", fig.canvas.get_width_height(), fig.canvas.tostring_rgb()
-                )
-                im = wandb.Image(im)
-                self.logger.experiment.log(
-                    {"image": im, "global_step": self.global_step + i}
-                )
-
-                plt.savefig(
-                    f"{save_path}/asd_{self.current_epoch}-{batch.ind_name[i]}.png"
-                )
-                plt.close()
         self.log("loss", loss)
 
         return loss
 
     def validation_step(self, batch, batch_idx):
-        if self.local_rank > 0:
-            return
+        if self.local_rank == 0 and batch_idx < 5:
+            imgs = self.p_sample_loop(batch.x.shape, batch.patches, batch.edge_index)
+            img = imgs[-1]
+            save_path = Path(f"results/{self.logger.experiment.name}/val")
+            for i in range(
+                min(batch.batch.max().item(), 4)
+            ):  # save max 4 images during training loop
+                idx = torch.where(batch.batch == i)[0]
+                patches_rgb = batch.patches[idx]
+                gt_pos = batch.x[idx]
+                pos = img[idx]
+                n_patches = batch.patches_dim[i]
+                i_name = batch.ind_name[i]
+                self.save_image(
+                    patches_rgb=patches_rgb,
+                    pos=pos,
+                    gt_pos=gt_pos,
+                    patches_dim=n_patches,
+                    ind_name=i_name,
+                    file_name=save_path,
+                )
+        accuracy_dict = defaultdict(lambda: [])
+        for i in range(batch.batch.max() + 1):
 
-        imgs = self.p_sample_loop(batch.x.shape, batch.patches, batch.edge_index)
-        img = imgs[-1]
-        save_path = Path(f"results/{self.logger.experiment.name}/val")
-        save_path.mkdir(parents=True, exist_ok=True)
-        for i in range(
-            min(batch.batch.max().item(), 4)
-        ):  # save max 4 images during training loop
-            fig, ax = plt.subplots(2, 2)
             idx = torch.where(batch.batch == i)[0]
             patches_rgb = batch.patches[idx]
             gt_pos = batch.x[idx]
             pos = img[idx]
-            gt_img = self.create_image_from_patches(
-                patches_rgb, gt_pos, n_patches=batch.patches_dim[i], i=i
+            n_patches = batch.patches_dim[i].tolist()
+            i_name = batch.ind_name[i]
+
+            assignement = greedy_cost_assignment(gt_pos, pos)
+            # self.num_images+=1
+
+            if (assignement[:, 0] == assignement[:, 1]).all():
+                accuracy_dict[tuple(n_patches)].append(1)
+            else:
+                accuracy_dict[tuple(n_patches)].append(0)
+        return accuracy_dict
+
+    def validation_epoch_end(self, outputs) -> None:
+        all_outs = self.all_gather(outputs)
+        out_dict = {}
+        for d in all_outs:
+            out_dict = {
+                k: out_dict.get(k, []) + d.get(k, [])
+                for k in out_dict.keys() | d.keys()
+            }
+
+        acc_dict = {}
+        overall_acc = []
+        for key, val in out_dict.items():
+            # acc_dict[key] = {}
+            arr = torch.stack(out_dict[key])
+            acc_dict[f"{key}_acc"] = arr.float().mean()
+            acc_dict[f"{key}_num_img"] = arr.shape[0]
+            overall_acc.append(arr.float().mean())
+        overall_acc = torch.stack(overall_acc).mean()  # torch.mean(overall_acc)
+
+        # mean = torch.mean(all_outs)
+        # num_images = all_outs.shape[0]
+
+        if self.trainer.is_global_zero:
+            self.log(
+                "val",
+                {"epoch": self.current_epoch, "overall_acc": overall_acc, **acc_dict},
+                rank_zero_only=True,
             )
+            self.log("val_acc", overall_acc)
 
-            pred_img = self.create_image_from_patches(
-                patches_rgb, pos, n_patches=batch.patches_dim[i], i=i
-            )
-            ax[0, 0].imshow(gt_img)
-            ax[0, 1].imshow(pred_img)
-            ax[1, 0].scatter(gt_pos[:, 0].cpu(), gt_pos[:, 1].cpu())
-            ax[1, 0].set_aspect("equal")
+    # def on_validation_epoch_start(self) -> None:
+    #     self.accuracy_dict = defaultdict(lambda: [])
 
-            ax[1, 1].scatter(pos[:, 0].cpu(), pos[:, 1].cpu())
-            ax[1, 1].set_aspect("equal")
-            ax[0, 0].set_title(f"{self.current_epoch}-{batch.ind_name[i]}")
-
-            ax[0, 1].set_title(f"{batch.patches_dim[i]}")
-
-            fig.canvas.draw()
-            im = PIL.Image.frombytes(
-                "RGB", fig.canvas.get_width_height(), fig.canvas.tostring_rgb()
-            )
-            im = wandb.Image(im)
-            self.logger.experiment.log(
-                {"val_image": im, "global_step": self.global_step + i}
-            )
-
-            plt.savefig(f"{save_path}/asd_{self.current_epoch}-{batch.ind_name[i]}.png")
-            plt.close()
+    # def validation_step(self, batch, batch_idx, *args, **kwargs):
+    # return self.test_step(batch, batch_idx, *args, **kwargs)
 
     def create_image_from_patches(self, patches, pos, n_patches=(4, 4), i=0):
 
@@ -489,66 +544,44 @@ class GNN_Diffusion(pl.LightningModule):
             y_pos = int((y + 1) * height / 2) - patch_size // 2
             new_image.paste(patch, (x_pos, y_pos))
         return new_image
-        # plt.figure()
-        # plt.imshow(new_image)
-        # plt.savefig(f"asd_{i}.png")
 
-    def training_step_old(self, batch, batch_idx):
+    def save_image(
+        self, patches_rgb, pos, gt_pos, patches_dim, ind_name, file_name: Path
+    ):
+        file_name.mkdir(parents=True, exist_ok=True)
 
-        batch = batch[0]
-        batch_size = batch.shape[0]
+        fig, ax = plt.subplots(2, 2)
 
-        results_folder = Path("./results")
+        gt_img = self.create_image_from_patches(
+            patches_rgb, gt_pos, n_patches=patches_dim, i=ind_name
+        )
+        assignement = greedy_cost_assignment(pos, gt_pos)
 
-        t = torch.randint(0, self.steps, (batch_size,), device=self.device).long()
+        pred_img = self.create_image_from_patches(
+            patches_rgb, pos, n_patches=patches_dim, i=ind_name
+        )
+        ax[0, 0].imshow(gt_img)
+        ax[0, 1].imshow(pred_img)
+        ax[1, 0].scatter(gt_pos[:, 0].cpu(), gt_pos[:, 1].cpu())
+        ax[1, 0].set_aspect("equal")
 
-        batch_2 = einops.rearrange(
-            batch,
-            "b c (w1 w) (h1 h) -> b (w1 h1) c w h",
-            w1=self.patches,
-            h1=self.patches,
+        ax[1, 1].scatter(pos[:, 0].cpu(), pos[:, 1].cpu())
+        ax[1, 1].set_aspect("equal")
+        ax[0, 0].set_title(f"{self.current_epoch}-{ind_name}")
+
+        ax[0, 1].set_title(f"{patches_dim}")
+
+        fig.canvas.draw()
+        im = PIL.Image.frombytes(
+            "RGB", fig.canvas.get_width_height(), fig.canvas.tostring_rgb()
+        )
+        im = wandb.Image(im)
+        self.logger.experiment.log(
+            {f"{file_name.stem}": im, "global_step": self.global_step}
         )
 
-        batch_noise = batch_2[:, :, -2:]
-        cond = batch_2[:, :, :3]
-
-        loss = self.p_losses(batch_noise, t, loss_type="huber", cond=cond)
-
-        if (
-            batch_idx != 0
-            and batch_idx % self.save_and_sample_every == 0
-            and self.local_rank == 0
-        ):
-
-            milestone = batch_idx // self.save_and_sample_every
-            batches = num_to_groups(4, batch_size)
-            all_images_list = list(
-                map(
-                    lambda n: self.sample(
-                        image_size=self.image_size,
-                        batch_size=n,
-                        channels=self.channels,
-                        cond=cond[:n],
-                    ),
-                    batches,
-                )
-            )
-            # all_images = torch.cat(all_images_list, dim=0)
-            all_images = torch.tensor(np.stack(all_images_list[0], 0))
-            all_images = (all_images + 1) * 0.5
-            self.save_img(
-                all_images[-1],
-                str(
-                    results_folder
-                    / f"{self.logger.experiment.name}"
-                    / f"{self.prefix}-{self.current_epoch}-{milestone}.png"
-                ),
-                self.logger.experiment,
-                self.global_step,
-            )
-        self.log("loss", loss)
-
-        return loss
+        plt.savefig(f"{file_name}/asd_{self.current_epoch}-{ind_name}.png")
+        plt.close()
 
     def save_img(self, img_list, file_str, logger, step):
         Path(file_str).parent.mkdir(exist_ok=True)
@@ -615,21 +648,6 @@ class GNN_Diffusion(pl.LightningModule):
         logger.log({"image": im, "global_step": step})
         plt.savefig(f"{file_str}")
 
-    def on_test_epoch_start(self) -> None:
-        if self.local_rank == 0:
-            self.correct = 0
-            self.num_images = 0
-        # return super().on_test_epoch_start()
-
-    def on_test_epoch_end(self) -> None:
-        if self.local_rank == 0:
-
-            logger = self.logger.experiment
-            accuracy = self.correct / (self.num_images + 1e-3)
-            print(f"Ep:{self.current_epoch:3d} - accuracy: {accuracy:0.4f}")
-            logger.log({"accuracy": accuracy, "epoch": self.current_epoch})
-        # return super().on_test_epoch_end()
-
     def generate_video(self, predicted_img_list):
         img1 = [im[0] for im in predicted_img_list]
         img1_stack = np.stack(img1, 0)
@@ -677,140 +695,6 @@ class GNN_Diffusion(pl.LightningModule):
             plt.ylim(-1.5, 1.5)
             plt.savefig(f"video/{i:04d}.png")
             plt.close()
-
-    # Save or display the new image
-
-    def test_step_old(
-        self, batch, batch_idx, *args, **kwargs
-    ):  # -> Optional[STEP_OUTPUT]:
-        if self.local_rank != 0:
-            return
-        self.p_sample_loop(batch.x, batch.patches, batch.edge_index)
-
-    def test_step_old(
-        self, batch, batch_idx, *args, **kwargs
-    ):  # -> Optional[STEP_OUTPUT]:
-        if self.local_rank != 0:
-            return
-
-        permutations = batch[0][1]
-        images = batch[0][0]
-
-        conditioning = images[:, :3]
-        pos = images[:, -2:]
-        logger = self.logger.experiment
-
-        # divide into patches
-        cond_patches = img_to_patches(conditioning, self.patches)
-
-        predicted_img_list = self.p_sample_loop(shape=pos.shape, cond=cond_patches)
-        predicted_img = predicted_img_list[-1]
-        # self.generate_video(predicted_img_list)
-
-        xx = einops.repeat(
-            torch.linspace(-1, 1, self.patches), "b -> b k1", k1=self.patch_size
-        )
-        y, x = torch.meshgrid(xx.flatten(), xx.flatten())
-        y = torch.flip(y, (0,))
-        pos_emb = torch.stack((x, y), 0)
-        pos_patches = einops.rearrange(
-            pos_emb,
-            "c (k1 w) (k2 h) -> (k1 k2) w h c",
-            k1=self.patches,
-            k2=self.patches,
-        ).mean((1, 2))
-        batch_size = images.shape[0]
-
-        matplotlib.use("agg")
-        fig, ax = plt.subplots(3, 4)
-
-        for i in range(batch_size):
-            permutate_gt_pos = pos_patches[permutations[i]]
-
-            img = (einops.rearrange(predicted_img[i][:3], "c w h -> w h c") + 1) * 0.5
-            pos = einops.rearrange(
-                predicted_img[i][-2:],
-                "c (k1 w) (k2 h) -> (k1 k2) w h c",
-                k1=self.patches,
-                k2=self.patches,
-            )
-            pos = pos.mean((1, 2))
-
-            cost = scipy.spatial.distance.cdist(permutate_gt_pos, pos, "euclidean")
-            cost = np.log(1 + cost)
-            ass = scipy.optimize.linear_sum_assignment(cost)
-            correct = (ass[0] == ass[1]).all()
-            self.num_images += 1
-            if correct:
-                self.correct += 1
-
-            idx = scipy.optimize.linear_sum_assignment(cost)[1]
-            img_patches = einops.rearrange(
-                img,
-                "(k1 w) (k2 h) c -> (k1 k2) w h c",
-                k1=self.patches,
-                k2=self.patches,
-            )
-            idx_sort = np.argsort(permutations[i].cpu())
-            img_perm = img_patches[idx_sort]
-
-            img_perm_original_shape = einops.rearrange(
-                img_perm,
-                "(k1 k2) w h c -> (k1 w) (k2 h) c",
-                k1=self.patches,
-                k2=self.patches,
-            )
-            new_img = einops.rearrange(
-                img_perm[idx],
-                "(k1 k2) w h c -> (k1 w) (k2 h) c",
-                k1=self.patches,
-                k2=self.patches,
-            )
-            ax[0][i].imshow(torch.tensor(img_perm_original_shape))
-            for k in range(self.patches**2):
-                ax[2][i].plot(pos[k][0], pos[k][1], "*", label=f"p-{k}")
-                ax[2][i].set_xlim([-1, 2])
-                ax[2][i].set_ylim([-1, 2])
-                ax[2][i].set_aspect("equal")
-            ax[1][i].imshow(torch.tensor(new_img))
-
-        ax[2][-1].legend(bbox_to_anchor=(1, -0.18), loc="upper right", ncol=4)
-        fig.subplots_adjust(bottom=0.3)
-        ax[0][0].set_title(
-            f"{self.prefix}-{self.current_epoch}-{self.global_step}-{batch_idx}"
-        )
-
-        fig.tight_layout()
-        fig.canvas.draw()
-        im = PIL.Image.frombytes(
-            "RGB", fig.canvas.get_width_height(), fig.canvas.tostring_rgb()
-        )
-        im = wandb.Image(im)
-        logger.log({"val_image": im, "global_step": self.global_step})
-
-        results_folder = Path("./results")
-
-        im_path = (
-            results_folder
-            / f"{self.logger.experiment.name}"
-            / "val"
-            / f"{self.prefix}-{self.current_epoch}-{self.global_step}-{batch_idx}.png"
-        )
-
-        im_path.parent.mkdir(exist_ok=True, parents=True)
-        plt.savefig(f"{im_path}")
-
-        pass
-        # return super().test_step(*args, **kwargs)
-
-    def on_validation_epoch_start(self) -> None:
-        self.on_test_epoch_start()
-
-    def on_validation_epoch_end(self) -> None:
-        self.on_test_epoch_end()
-
-    # def validation_step(self, batch, batch_idx, *args, **kwargs):
-    # return self.test_step(batch, batch_idx, *args, **kwargs)
 
 
 def img_to_patches(t, patches_per_dim):

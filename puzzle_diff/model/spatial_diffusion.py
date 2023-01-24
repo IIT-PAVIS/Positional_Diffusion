@@ -40,6 +40,7 @@ import torch_geometric.nn.models
 from PIL import Image
 
 import matplotlib
+import torchmetrics
 
 matplotlib.use("agg")
 
@@ -215,16 +216,27 @@ class GNN_Diffusion(pl.LightningModule):
 
         self.save_hyperparameters()
 
-    def forward(self, xy_pos, time, patch_rgb, edge_index) -> Any:
+    def initialize_torchmetrics(self, n_patches):
+        metrics = {}
+
+        for i in n_patches:
+            metrics[f"{i}_acc"] = torchmetrics.MeanMetric()
+            metrics[f"{i}_nImages"] = torchmetrics.SumMetric()
+        metrics["overall_acc"] = torchmetrics.MeanMetric()
+        metrics["overall_nImages"] = torchmetrics.SumMetric()
+        self.metrics = nn.ModuleDict(metrics)
+
+    def forward(self, xy_pos, time, patch_rgb, edge_index, patch_feats=None) -> Any:
         # mean = patch_rgb.new_tensor([0.4850, 0.4560, 0.4060])[None, :, None, None]
         # std = patch_rgb.new_tensor([0.2290, 0.2240, 0.2250])[None, :, None, None]
+        if patch_feats == None:
 
-        patch_rgb = (patch_rgb - self.mean) / self.std
+            patch_rgb = (patch_rgb - self.mean) / self.std
 
-        # fe[3].reshape(fe[0].shape[0],-1)
-        patch_feats = self.visual_backbone.forward(patch_rgb)[3].reshape(
-            patch_rgb.shape[0], -1
-        )
+            # fe[3].reshape(fe[0].shape[0],-1)
+            patch_feats = self.visual_backbone.forward(patch_rgb)[3].reshape(
+                patch_rgb.shape[0], -1
+            )
         # patch_feats = patch_feats
         time_feats = self.time_emb(time)
         pos_feats = self.pos_mlp(xy_pos)
@@ -234,6 +246,16 @@ class GNN_Diffusion(pl.LightningModule):
         final_feats = self.final_mlp(feats + combined_feats)
 
         return final_feats
+
+    def visual_features(self, patch_rgb):
+
+        patch_rgb = (patch_rgb - self.mean) / self.std
+
+        # fe[3].reshape(fe[0].shape[0],-1)
+        patch_feats = self.visual_backbone.forward(patch_rgb)[3].reshape(
+            patch_rgb.shape[0], -1
+        )
+        return patch_feats
 
     # forward diffusion
     def q_sample(self, x_start, t, noise=None):
@@ -287,7 +309,7 @@ class GNN_Diffusion(pl.LightningModule):
         return loss
 
     @torch.no_grad()
-    def p_sample_ddpm(self, x, t, t_index, cond, edge_index):
+    def p_sample_ddpm(self, x, t, t_index, cond, edge_index, patch_feats):
         betas_t = extract(self.betas, t, x.shape)
         sqrt_one_minus_alphas_cumprod_t = extract(
             self.sqrt_one_minus_alphas_cumprod, t, x.shape
@@ -297,7 +319,10 @@ class GNN_Diffusion(pl.LightningModule):
         # Equation 11 in the paper
         # Use our model (noise predictor) to predict the mean
         model_mean = sqrt_recip_alphas_t * (
-            x - betas_t * self(x, t, cond, edge_index) / sqrt_one_minus_alphas_cumprod_t
+            x
+            - betas_t
+            * self(x, t, cond, edge_index, patch_feats=patch_feats)
+            / sqrt_one_minus_alphas_cumprod_t
         )
 
         if t_index == 0:
@@ -325,7 +350,7 @@ class GNN_Diffusion(pl.LightningModule):
 
         model_output = self(x, t, cond)
 
-        # estimate x_0
+        # estimate x    _0
         x_0 = (x - beta**0.5 * model_output) / alpha_prod**0.5
         variance = (beta_prev / beta) * (1 - alpha_prod / alpha_prod_prev)
         std_eta = eta * variance**0.5
@@ -362,6 +387,8 @@ class GNN_Diffusion(pl.LightningModule):
         # )
         imgs = []
 
+        patch_feats = self.visual_features(cond)
+
         for i in tqdm(
             reversed(range(0, self.steps)),
             desc="sampling loop time step",
@@ -373,6 +400,7 @@ class GNN_Diffusion(pl.LightningModule):
                 i,
                 cond=cond,
                 edge_index=edge_index,
+                patch_feats=patch_feats,
             )
             imgs.append(img)
             # if i is not None:  # == 0:
@@ -390,8 +418,8 @@ class GNN_Diffusion(pl.LightningModule):
         return imgs
 
     @torch.no_grad()
-    def p_sample(self, x, t, t_index, cond, edge_index, sampling_func):
-        return sampling_func(x, t, t_index, cond, edge_index)
+    def p_sample(self, x, t, t_index, cond, edge_index, sampling_func, patch_feats):
+        return sampling_func(x, t, t_index, cond, edge_index, patch_feats)
 
     @torch.no_grad()
     def sample(self, image_size, batch_size=16, channels=3, cond=None, edge_index=None):
@@ -450,76 +478,90 @@ class GNN_Diffusion(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
+        with torch.no_grad():
 
-        imgs = self.p_sample_loop(batch.x.shape, batch.patches, batch.edge_index)
-        img = imgs[-1]
-        if self.local_rank == 0 and batch_idx < 5:
-            save_path = Path(f"results/{self.logger.experiment.name}/val")
-            for i in range(
-                min(batch.batch.max().item(), 4)
-            ):  # save max 4 images during training loop
+            imgs = self.p_sample_loop(batch.x.shape, batch.patches, batch.edge_index)
+            img = imgs[-1]
+
+            if self.local_rank == 0 and batch_idx < 5:
+                save_path = Path(f"results/{self.logger.experiment.name}/val")
+                for i in range(
+                    min(batch.batch.max().item(), 4)
+                ):  # save max 4 images during training loop
+                    idx = torch.where(batch.batch == i)[0]
+                    patches_rgb = batch.patches[idx]
+                    gt_pos = batch.x[idx]
+                    pos = img[idx]
+                    n_patches = batch.patches_dim[i]
+                    i_name = batch.ind_name[i]
+                    self.save_image(
+                        patches_rgb=patches_rgb,
+                        pos=pos,
+                        gt_pos=gt_pos,
+                        patches_dim=n_patches,
+                        ind_name=i_name,
+                        file_name=save_path,
+                    )
+            # accuracy_dict = defaultdict(lambda: [])
+            for i in range(batch.batch.max() + 1):
+
                 idx = torch.where(batch.batch == i)[0]
                 patches_rgb = batch.patches[idx]
                 gt_pos = batch.x[idx]
                 pos = img[idx]
-                n_patches = batch.patches_dim[i]
+                n_patches = batch.patches_dim[i].tolist()
                 i_name = batch.ind_name[i]
-                self.save_image(
-                    patches_rgb=patches_rgb,
-                    pos=pos,
-                    gt_pos=gt_pos,
-                    patches_dim=n_patches,
-                    ind_name=i_name,
-                    file_name=save_path,
-                )
-        accuracy_dict = defaultdict(lambda: [])
-        for i in range(batch.batch.max() + 1):
 
-            idx = torch.where(batch.batch == i)[0]
-            patches_rgb = batch.patches[idx]
-            gt_pos = batch.x[idx]
-            pos = img[idx]
-            n_patches = batch.patches_dim[i].tolist()
-            i_name = batch.ind_name[i]
+                assignement = greedy_cost_assignment(gt_pos, pos)
 
-            assignement = greedy_cost_assignment(gt_pos, pos)
-            # self.num_images+=1
+                # self.num_images+=1
 
-            if (assignement[:, 0] == assignement[:, 1]).all():
-                accuracy_dict[tuple(n_patches)].append(1)
-            else:
-                accuracy_dict[tuple(n_patches)].append(0)
-        return accuracy_dict
+                self.metrics[f"{tuple(n_patches)}_nImages"].update(1)
+                self.metrics["overall_nImages"].update(1)
+                if (assignement[:, 0] == assignement[:, 1]).all():
+                    self.metrics[f"{tuple(n_patches)}_acc"].update(1)
+                    self.metrics["overall_acc"].update(1)
+                    # accuracy_dict[tuple(n_patches)].append(1)
+                else:
+
+                    self.metrics[f"{tuple(n_patches)}_acc"].update(0)
+
+                    self.metrics["overall_acc"].update(0)
+                    # accuracy_dict[tuple(n_patches)].append(0)
+
+            self.log_dict(self.metrics)
+        # return accuracy_dict
 
     def validation_epoch_end(self, outputs) -> None:
-        all_outs = self.all_gather(outputs)
+        self.log_dict(self.metrics)
+        # all_outs = self.all_gather(outputs)
 
-        # mean = torch.mean(all_outs)
-        # num_images = all_outs.shape[0]
+        ## mean = torch.mean(all_outs)
+        ## num_images = all_outs.shape[0]
 
-        if self.local_rank == 0:
-            out_dict = {}
-            for d in all_outs:
-                out_dict = {
-                    k: out_dict.get(k, []) + d.get(k, [])
-                    for k in out_dict.keys() | d.keys()
-                }
+        # if self.local_rank == 0:
+        # out_dict = {}
+        # for d in all_outs:
+        # out_dict = {
+        # k: out_dict.get(k, []) + d.get(k, [])
+        # for k in out_dict.keys() | d.keys()
+        # }
 
-            acc_dict = {}
-            overall_acc = []
-            for key, val in out_dict.items():
-                # acc_dict[key] = {}
-                arr = torch.stack(out_dict[key])
-                acc_dict[f"{key}_acc"] = arr.float().mean()
-                acc_dict[f"{key}_num_img"] = arr.shape[0]
-                overall_acc.append(arr.float().mean())
-            overall_acc = torch.stack(overall_acc).mean()  # torch.mean(overall_acc)
-            self.log(
-                "val",
-                {"epoch": self.current_epoch, "overall_acc": overall_acc, **acc_dict},
-                rank_zero_only=True,
-            )
-            self.log("val_acc", overall_acc, rank_zero_only=True)
+        # acc_dict = {}
+        # overall_acc = []
+        # for key, val in out_dict.items():
+        ## acc_dict[key] = {}
+        # arr = torch.stack(out_dict[key])
+        # acc_dict[f"{key}_acc"] = arr.float().mean()
+        # acc_dict[f"{key}_num_img"] = arr.shape[0]
+        # overall_acc.append(arr.float().mean())
+        # overall_acc = torch.stack(overall_acc).mean()  # torch.mean(overall_acc)
+        # self.log(
+        # "val",
+        # {"epoch": self.current_epoch, "overall_acc": overall_acc, **acc_dict},
+        # rank_zero_only=True,
+        # )
+        # self.log("val_acc", overall_acc, rank_zero_only=True)
 
     # def on_validation_epoch_start(self) -> None:
     #     self.accuracy_dict = defaultdict(lambda: [])

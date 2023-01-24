@@ -50,7 +50,7 @@ def main(batch_size, gpus, steps):
         puzzleDt_train, batch_size=batch_size, num_workers=8, shuffle=False
     )
     dl_test = torch_geometric.loader.DataLoader(
-        puzzleDt_test, batch_size=batch_size, num_workers=8, shuffle=False
+        puzzleDt_test, batch_size=batch_size * 4, num_workers=8, shuffle=False
     )
 
     # dl_train = dl_test  # TODO <----------------- CHANGE to train once debugging
@@ -60,18 +60,21 @@ def main(batch_size, gpus, steps):
     model = GNN_Diffusion(
         steps=steps, sampling="DDPM", save_and_sample_every=save_and_sample_every
     )
+    model.initialize_torchmetrics([(6, 6), (8, 8), (10, 10), (12, 12)])
 
     wandb_logger = WandbLogger(
         project="Puzzle-Diff", settings=wandb.Settings(code_dir="."), offline=False
     )
-    checkpoint_callback = ModelCheckpoint(monitor="val_acc", mode="max", save_top_k=2)
+    checkpoint_callback = ModelCheckpoint(
+        monitor="overall_acc", mode="max", save_top_k=2
+    )
 
     trainer = pl.Trainer(
         accelerator="gpu",
         devices=gpus,
         strategy="ddp" if gpus > 1 else None,
-        limit_val_batches=10,
-        limit_train_batches=10,
+        # limit_val_batches=10,
+        # limit_train_batches=10,
         # check_val_every_n_epoch=5,
         logger=wandb_logger,
         callbacks=[checkpoint_callback],
@@ -85,7 +88,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
 
     # Add the arguments to the parser
-    ap.add_argument("-batch_size", type=int, default=12)
+    ap.add_argument("-batch_size", type=int, default=2)
     ap.add_argument("-gpus", type=int, default=1)
     ap.add_argument("-steps", type=int, default=300)
 

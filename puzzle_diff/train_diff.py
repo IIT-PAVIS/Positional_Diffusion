@@ -50,7 +50,7 @@ def main(batch_size, gpus, steps):
         puzzleDt_train, batch_size=batch_size, num_workers=8, shuffle=False
     )
     dl_test = torch_geometric.loader.DataLoader(
-        puzzleDt_test, batch_size=batch_size * 4, num_workers=8, shuffle=False
+        puzzleDt_test, batch_size=batch_size * 2, num_workers=8, shuffle=False
     )
 
     # dl_train = dl_test  # TODO <----------------- CHANGE to train once debugging

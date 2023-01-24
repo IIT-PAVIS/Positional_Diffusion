@@ -229,14 +229,37 @@ class GNN_Diffusion(pl.LightningModule):
     def forward(self, xy_pos, time, patch_rgb, edge_index, patch_feats=None) -> Any:
         # mean = patch_rgb.new_tensor([0.4850, 0.4560, 0.4060])[None, :, None, None]
         # std = patch_rgb.new_tensor([0.2290, 0.2240, 0.2250])[None, :, None, None]
-        if patch_feats == None:
+        # if patch_feats == None:
 
-            patch_rgb = (patch_rgb - self.mean) / self.std
+        patch_rgb = (patch_rgb - self.mean) / self.std
 
-            # fe[3].reshape(fe[0].shape[0],-1)
-            patch_feats = self.visual_backbone.forward(patch_rgb)[3].reshape(
-                patch_rgb.shape[0], -1
-            )
+        # fe[3].reshape(fe[0].shape[0],-1)
+        patch_feats = self.visual_backbone.forward(patch_rgb)[3].reshape(
+            patch_rgb.shape[0], -1
+        )
+        # patch_feats = patch_feats
+        time_feats = self.time_emb(time)
+        pos_feats = self.pos_mlp(xy_pos)
+        combined_feats = torch.cat([patch_feats, pos_feats, time_feats], -1)
+        combined_feats = self.mlp(combined_feats)
+        feats = self.gnn_backbone(x=combined_feats, edge_index=edge_index)
+        final_feats = self.final_mlp(feats + combined_feats)
+
+        return final_feats
+
+    def forward_with_feats(
+        self, xy_pos, time, patch_rgb, edge_index, patch_feats=None
+    ) -> Any:
+        # mean = patch_rgb.new_tensor([0.4850, 0.4560, 0.4060])[None, :, None, None]
+        # std = patch_rgb.new_tensor([0.2290, 0.2240, 0.2250])[None, :, None, None]
+        # if patch_feats == None:
+
+        # patch_rgb = (patch_rgb - self.mean) / self.std
+
+        # # fe[3].reshape(fe[0].shape[0],-1)
+        # patch_feats = self.visual_backbone.forward(patch_rgb)[3].reshape(
+        # patch_rgb.shape[0], -1
+        # )
         # patch_feats = patch_feats
         time_feats = self.time_emb(time)
         pos_feats = self.pos_mlp(xy_pos)
@@ -321,7 +344,7 @@ class GNN_Diffusion(pl.LightningModule):
         model_mean = sqrt_recip_alphas_t * (
             x
             - betas_t
-            * self(x, t, cond, edge_index, patch_feats=patch_feats)
+            * self.forward_with_feats(x, t, cond, edge_index, patch_feats=patch_feats)
             / sqrt_one_minus_alphas_cumprod_t
         )
 

@@ -497,7 +497,7 @@ class GNN_Diffusion(pl.LightningModule):
         # mean = torch.mean(all_outs)
         # num_images = all_outs.shape[0]
 
-        if self.trainer.is_global_zero:
+        if self.local_rank == 0:
             out_dict = {}
             for d in all_outs:
                 out_dict = {
@@ -519,7 +519,7 @@ class GNN_Diffusion(pl.LightningModule):
                 {"epoch": self.current_epoch, "overall_acc": overall_acc, **acc_dict},
                 rank_zero_only=True,
             )
-            self.log("val_acc", overall_acc)
+            self.log("val_acc", overall_acc, rank_zero_only=True)
 
     # def on_validation_epoch_start(self) -> None:
     #     self.accuracy_dict = defaultdict(lambda: [])

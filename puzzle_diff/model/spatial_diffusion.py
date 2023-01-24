@@ -493,27 +493,27 @@ class GNN_Diffusion(pl.LightningModule):
 
     def validation_epoch_end(self, outputs) -> None:
         all_outs = self.all_gather(outputs)
-        out_dict = {}
-        for d in all_outs:
-            out_dict = {
-                k: out_dict.get(k, []) + d.get(k, [])
-                for k in out_dict.keys() | d.keys()
-            }
-
-        acc_dict = {}
-        overall_acc = []
-        for key, val in out_dict.items():
-            # acc_dict[key] = {}
-            arr = torch.stack(out_dict[key])
-            acc_dict[f"{key}_acc"] = arr.float().mean()
-            acc_dict[f"{key}_num_img"] = arr.shape[0]
-            overall_acc.append(arr.float().mean())
-        overall_acc = torch.stack(overall_acc).mean()  # torch.mean(overall_acc)
 
         # mean = torch.mean(all_outs)
         # num_images = all_outs.shape[0]
 
         if self.trainer.is_global_zero:
+            out_dict = {}
+            for d in all_outs:
+                out_dict = {
+                    k: out_dict.get(k, []) + d.get(k, [])
+                    for k in out_dict.keys() | d.keys()
+                }
+
+            acc_dict = {}
+            overall_acc = []
+            for key, val in out_dict.items():
+                # acc_dict[key] = {}
+                arr = torch.stack(out_dict[key])
+                acc_dict[f"{key}_acc"] = arr.float().mean()
+                acc_dict[f"{key}_num_img"] = arr.shape[0]
+                overall_acc.append(arr.float().mean())
+            overall_acc = torch.stack(overall_acc).mean()  # torch.mean(overall_acc)
             self.log(
                 "val",
                 {"epoch": self.current_epoch, "overall_acc": overall_acc, **acc_dict},

@@ -70,9 +70,9 @@ def main(batch_size, gpus, steps):
         accelerator="gpu",
         devices=gpus,
         strategy="ddp" if gpus > 1 else None,
-        # limit_val_batches=10,
-        # limit_train_batches=10,
-        check_val_every_n_epoch=5,
+        limit_val_batches=10,
+        limit_train_batches=10,
+        # check_val_every_n_epoch=5,
         logger=wandb_logger,
         callbacks=[checkpoint_callback],
     )

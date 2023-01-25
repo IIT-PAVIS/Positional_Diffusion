@@ -4,7 +4,8 @@ import pytorch_lightning as pl
 import scipy
 from functools import partial
 from transformers.optimization import Adafactor
-from .backbones.Transformer_GNN import Transformer_GNN
+
+# from .backbones.Transformer_GNN import Transformer_GNN
 from collections import defaultdict
 
 # from .network_modules import (

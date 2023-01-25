@@ -18,7 +18,7 @@ from pytorch_lightning.loggers import WandbLogger
 import wandb
 
 
-def main(batch_size, gpus, steps):
+def main(batch_size, gpus, steps, num_workers):
 
     celeba_get_fn = lambda x: x[0]
 
@@ -47,10 +47,10 @@ def main(batch_size, gpus, steps):
     )
 
     dl_train = torch_geometric.loader.DataLoader(
-        puzzleDt_train, batch_size=batch_size, num_workers=8, shuffle=False
+        puzzleDt_train, batch_size=batch_size, num_workers=num_workers, shuffle=False
     )
     dl_test = torch_geometric.loader.DataLoader(
-        puzzleDt_test, batch_size=batch_size, num_workers=8, shuffle=False
+        puzzleDt_test, batch_size=batch_size, num_workers=num_workers, shuffle=False
     )
 
     # dl_train = dl_test  # TODO <----------------- CHANGE to train once debugging
@@ -91,6 +91,12 @@ if __name__ == "__main__":
     ap.add_argument("-batch_size", type=int, default=12)
     ap.add_argument("-gpus", type=int, default=1)
     ap.add_argument("-steps", type=int, default=300)
+    ap.add_argument("-num_workers", type=int, default=8)
 
     args = ap.parse_args()
-    main(batch_size=args.batch_size, gpus=args.gpus, steps=args.steps)
+    main(
+        batch_size=args.batch_size,
+        gpus=args.gpus,
+        steps=args.steps,
+        num_workers=args.num_workers,
+    )

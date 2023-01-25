@@ -63,7 +63,7 @@ def main(batch_size, gpus, steps, num_workers):
     model.initialize_torchmetrics([(6, 6), (8, 8), (10, 10), (12, 12)])
 
     wandb_logger = WandbLogger(
-        project="Puzzle-Diff", settings=wandb.Settings(code_dir="."), offline=True
+        project="Puzzle-Diff", settings=wandb.Settings(code_dir="."), offline=False
     )
     checkpoint_callback = ModelCheckpoint(
         monitor="overall_acc", mode="max", save_top_k=2

@@ -600,7 +600,7 @@ class GNN_Diffusion(pl.LightningModule):
         gt_img = self.create_image_from_patches(
             patches_rgb, gt_pos, n_patches=patches_dim, i=ind_name
         )
-        assignement = greedy_cost_assignment(pos, gt_pos)
+        #assignement = greedy_cost_assignment(pos, gt_pos)
 
         pred_img = self.create_image_from_patches(
             patches_rgb, pos, n_patches=patches_dim, i=ind_name
@@ -692,6 +692,7 @@ class GNN_Diffusion(pl.LightningModule):
         im = wandb.Image(im)
         logger.log({"image": im, "global_step": step})
         plt.savefig(f"{file_str}")
+        plt.close()
 
     def generate_video(self, predicted_img_list):
         img1 = [im[0] for im in predicted_img_list]

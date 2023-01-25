@@ -12,7 +12,7 @@ import argparse
 from torchvision.datasets import CelebA
 import pytorch_lightning as pl
 import math
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import ModelCheckpoint, ModelSummary
 
 from pytorch_lightning.loggers import WandbLogger
 import wandb
@@ -63,7 +63,7 @@ def main(batch_size, gpus, steps):
     model.initialize_torchmetrics([(6, 6), (8, 8), (10, 10), (12, 12)])
 
     wandb_logger = WandbLogger(
-        project="Puzzle-Diff", settings=wandb.Settings(code_dir="."), offline=False
+        project="Puzzle-Diff", settings=wandb.Settings(code_dir="."), offline=True
     )
     checkpoint_callback = ModelCheckpoint(
         monitor="overall_acc", mode="max", save_top_k=2
@@ -77,7 +77,7 @@ def main(batch_size, gpus, steps):
         # limit_train_batches=10,
         check_val_every_n_epoch=5,
         logger=wandb_logger,
-        callbacks=[checkpoint_callback],
+        callbacks=[checkpoint_callback, ModelSummary(max_depth=2)],
     )
     trainer.fit(model, dl_train, dl_test)
 
@@ -88,7 +88,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
 
     # Add the arguments to the parser
-    ap.add_argument("-batch_size", type=int, default=2)
+    ap.add_argument("-batch_size", type=int, default=12)
     ap.add_argument("-gpus", type=int, default=1)
     ap.add_argument("-steps", type=int, default=300)
 

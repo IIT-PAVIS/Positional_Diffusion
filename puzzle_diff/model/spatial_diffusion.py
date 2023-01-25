@@ -4,7 +4,7 @@ import pytorch_lightning as pl
 import scipy
 from functools import partial
 from transformers.optimization import Adafactor
-from .Transformer_GNN import Transformer_GNN
+from .backbones.Transformer_GNN import Transformer_GNN
 from collections import defaultdict
 
 # from .network_modules import (
@@ -41,6 +41,7 @@ from PIL import Image
 
 import matplotlib
 import torchmetrics
+from .backbones import Dark_TFConv, Eff_GAT
 
 matplotlib.use("agg")
 
@@ -176,43 +177,9 @@ class GNN_Diffusion(pl.LightningModule):
             self.betas * (1.0 - self.alphas_cumprod_prev) / (1.0 - self.alphas_cumprod)
         )
 
-        ### BACKBONE
-
-        self.visual_backbone = timm.create_model(
-            "cspdarknet53", pretrained=True, features_only=True
-        )
-
         self.steps = steps
-
-        self.combined_features_dim = 4096 + 32 + 32
-
-        # self.gnn_backbone = torch_geometric.nn.models.GAT(
-        #     in_channels=self.combined_features_dim,
-        #     hidden_channels=256,
-        #     num_layers=2,
-        #     out_channels=self.combined_features_dim,
-        # )
-        self.gnn_backbone = Transformer_GNN(
-            self.combined_features_dim,
-            hidden_dim=128 * 4,
-            heads=4,
-            output_size=self.combined_features_dim,
-        )
-        self.time_emb = nn.Embedding(self.steps, 32)
-        self.pos_mlp = nn.Sequential(nn.Linear(2, 64), nn.GELU(), nn.Linear(64, 32))
-        self.mlp = nn.Sequential(
-            nn.Linear(self.combined_features_dim, 128),
-            nn.GELU(),
-            nn.Linear(128, self.combined_features_dim),
-        )
-        self.final_mlp = nn.Sequential(
-            nn.Linear(self.combined_features_dim, 64), nn.GELU(), nn.Linear(64, 2)
-        )
-
-        mean = torch.tensor([0.4850, 0.4560, 0.4060])[None, :, None, None]
-        std = torch.tensor([0.2290, 0.2240, 0.2250])[None, :, None, None]
-        self.register_buffer("mean", mean)
-        self.register_buffer("std", std)
+        ### BACKBONE
+        self.model = Eff_GAT(steps=steps)
 
         self.save_hyperparameters()
 
@@ -227,29 +194,38 @@ class GNN_Diffusion(pl.LightningModule):
         self.metrics = nn.ModuleDict(metrics)
 
     def forward(self, xy_pos, time, patch_rgb, edge_index, patch_feats=None) -> Any:
-        # mean = patch_rgb.new_tensor([0.4850, 0.4560, 0.4060])[None, :, None, None]
-        # std = patch_rgb.new_tensor([0.2290, 0.2240, 0.2250])[None, :, None, None]
-        # if patch_feats == None:
+        return self.model(xy_pos, time, patch_rgb, edge_index)
+        # # mean = patch_rgb.new_tensor([0.4850, 0.4560, 0.4060])[None, :, None, None]
+        # # std = patch_rgb.new_tensor([0.2290, 0.2240, 0.2250])[None, :, None, None]
+        # # if patch_feats == None:
 
-        patch_rgb = (patch_rgb - self.mean) / self.std
+        # patch_rgb = (patch_rgb - self.mean) / self.std
 
-        # fe[3].reshape(fe[0].shape[0],-1)
-        patch_feats = self.visual_backbone.forward(patch_rgb)[3].reshape(
-            patch_rgb.shape[0], -1
-        )
-        # patch_feats = patch_feats
-        time_feats = self.time_emb(time)
-        pos_feats = self.pos_mlp(xy_pos)
-        combined_feats = torch.cat([patch_feats, pos_feats, time_feats], -1)
-        combined_feats = self.mlp(combined_feats)
-        feats = self.gnn_backbone(x=combined_feats, edge_index=edge_index)
-        final_feats = self.final_mlp(feats + combined_feats)
+        # # fe[3].reshape(fe[0].shape[0],-1)
+        # patch_feats = self.visual_backbone.forward(patch_rgb)[3].reshape(
+        #     patch_rgb.shape[0], -1
+        # )
+        # # patch_feats = patch_feats
+        # time_feats = self.time_emb(time)
+        # pos_feats = self.pos_mlp(xy_pos)
+        # combined_feats = torch.cat([patch_feats, pos_feats, time_feats], -1)
+        # combined_feats = self.mlp(combined_feats)
+        # feats = self.gnn_backbone(x=combined_feats, edge_index=edge_index)
+        # final_feats = self.final_mlp(feats + combined_feats)
 
-        return final_feats
+        # return final_feats
 
     def forward_with_feats(
-        self, xy_pos, time, patch_rgb, edge_index, patch_feats=None
+        self,
+        xy_pos: Tensor,
+        time: Tensor,
+        patch_rgb: Tensor,
+        edge_index: Tensor,
+        patch_feats: Tensor,
     ) -> Any:
+        return self.model.forward_with_feats(
+            xy_pos, time, patch_rgb, edge_index, patch_feats
+        )
         # mean = patch_rgb.new_tensor([0.4850, 0.4560, 0.4060])[None, :, None, None]
         # std = patch_rgb.new_tensor([0.2290, 0.2240, 0.2250])[None, :, None, None]
         # if patch_feats == None:
@@ -261,24 +237,25 @@ class GNN_Diffusion(pl.LightningModule):
         # patch_rgb.shape[0], -1
         # )
         # patch_feats = patch_feats
-        time_feats = self.time_emb(time)
-        pos_feats = self.pos_mlp(xy_pos)
-        combined_feats = torch.cat([patch_feats, pos_feats, time_feats], -1)
-        combined_feats = self.mlp(combined_feats)
-        feats = self.gnn_backbone(x=combined_feats, edge_index=edge_index)
-        final_feats = self.final_mlp(feats + combined_feats)
+        # time_feats = self.time_emb(time)
+        # pos_feats = self.pos_mlp(xy_pos)
+        # combined_feats = torch.cat([patch_feats, pos_feats, time_feats], -1)
+        # combined_feats = self.mlp(combined_feats)
+        # feats = self.gnn_backbone(x=combined_feats, edge_index=edge_index)
+        # final_feats = self.final_mlp(feats + combined_feats)
 
-        return final_feats
+        # return final_feats
 
     def visual_features(self, patch_rgb):
 
-        patch_rgb = (patch_rgb - self.mean) / self.std
+        # patch_rgb = (patch_rgb - self.mean) / self.std
 
-        # fe[3].reshape(fe[0].shape[0],-1)
-        patch_feats = self.visual_backbone.forward(patch_rgb)[3].reshape(
-            patch_rgb.shape[0], -1
-        )
-        return patch_feats
+        # # fe[3].reshape(fe[0].shape[0],-1)
+        # patch_feats = self.visual_backbone.forward(patch_rgb)[3].reshape(
+        #     patch_rgb.shape[0], -1
+        # )
+        # return patch_feats
+        return self.model.visual_features(patch_rgb)
 
     # forward diffusion
     def q_sample(self, x_start, t, noise=None):
@@ -425,7 +402,7 @@ class GNN_Diffusion(pl.LightningModule):
                 edge_index=edge_index,
                 patch_feats=patch_feats,
             )
-            imgs.append(img)
+            # imgs.append(img)
             # if i is not None:  # == 0:
             # if i == 0:
             #     img2 = img.clone()
@@ -438,6 +415,7 @@ class GNN_Diffusion(pl.LightningModule):
             #         w1=self.patches,
             #     )
             #     imgs.append(img2.cpu().numpy())
+        imgs.append(img)
         return imgs
 
     @torch.no_grad()

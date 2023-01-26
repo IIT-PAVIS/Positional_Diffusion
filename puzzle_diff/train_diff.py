@@ -37,13 +37,13 @@ def main(batch_size, gpus, steps, num_workers):
     puzzleDt_train = Puzzle_Dataset(
         dataset=celebA_tr,
         dataset_get_fn=celeba_get_fn,
-        patch_per_dim=[(6, 6), (8, 8), (10, 10), (12, 12)],
+        patch_per_dim=[(6, 6), (8, 8), (10, 10)],
     )
 
     puzzleDt_test = Puzzle_Dataset(
         dataset=celebA_test,
         dataset_get_fn=celeba_get_fn,
-        patch_per_dim=[(6, 6), (8, 8), (10, 10), (12, 12)],
+        patch_per_dim=[(6, 6), (7, 7), (8, 8), (9, 9), (10, 10)],
     )
 
     dl_train = torch_geometric.loader.DataLoader(
@@ -60,7 +60,7 @@ def main(batch_size, gpus, steps, num_workers):
     model = GNN_Diffusion(
         steps=steps, sampling="DDPM", save_and_sample_every=save_and_sample_every
     )
-    model.initialize_torchmetrics([(6, 6), (8, 8), (10, 10), (12, 12)])
+    model.initialize_torchmetrics([(6, 6), (7, 7), (8, 8), (9, 9), (10, 10)])
 
     wandb_logger = WandbLogger(
         project="Puzzle-Diff", settings=wandb.Settings(code_dir="."), offline=False

@@ -1,8 +1,9 @@
 from torch.utils.data import Dataset
 from pathlib import Path
-from PIL import Image
+from PIL import Image, ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES=True
 
-import tables as tb
+# import tables as tb
 
 
 class Wikiart_DT(Dataset):
@@ -25,17 +26,17 @@ class Wikiart_DT(Dataset):
         return Image.open(self.images[index]), None
 
 
-class Wikiart_DT_pytables(Dataset):
-    def __init__(self) -> None:
-        super().__init__()
+ # class Wikiart_DT_pytables(Dataset):
+ #   def __init__(self) -> None:
+ #       super().__init__()
 
-        # Open the existing HDF5 file
-        file = tb.open_file("wikiart_tr.h5", mode="r", cache_size=32 * 768 * 768 * 3)
+ #       # Open the existing HDF5 file
+ #       file = tb.open_file("wikiart_tr.h5", mode="r", cache_size=32 * 768 * 768 * 3)
 
-        self.data = file.root.images.images
+ #       self.data = file.root.images.images
 
-    def __len__(self):
-        return self.data.shape[0]
+ #   def __len__(self):
+ #       return self.data.shape[0]
 
-    def __getitem__(self, index):
-        return Image.fromarray(self.data[index]), None
+ #   def __getitem__(self, index):
+ #       return Image.fromarray(self.data[index]), None

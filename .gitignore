@@ -6,6 +6,7 @@ Puzzle-Diff/
 dataset_old_delete/
 .vscode/
 wandb/
+singularity/*.o*
 
 *.png
 *.ckpt

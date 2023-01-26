@@ -7,7 +7,7 @@ import torch_geometric
 sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
 
 from dataset.puzzle_dataset import Puzzle_Dataset
-from dataset.wikiart_dt import Wikiart_DT, Wikiart_DT_pytables
+from dataset.wikiart_dt import Wikiart_DT#, Wikiart_DT_pytables
 from model.spatial_diffusion import GNN_Diffusion
 import argparse
 from torchvision.datasets import CelebA

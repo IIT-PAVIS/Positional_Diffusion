@@ -194,8 +194,8 @@ class GNN_Diffusion(pl.LightningModule):
         metrics["overall_nImages"] = torchmetrics.SumMetric()
         self.metrics = nn.ModuleDict(metrics)
 
-    def forward(self, xy_pos, time, patch_rgb, edge_index, patch_feats=None) -> Any:
-        return self.model(xy_pos, time, patch_rgb, edge_index)
+    def forward(self, xy_pos, time, patch_rgb, edge_index, batch) -> Any:
+        return self.model(xy_pos, time, patch_rgb, edge_index, batch)
         # # mean = patch_rgb.new_tensor([0.4850, 0.4560, 0.4060])[None, :, None, None]
         # # std = patch_rgb.new_tensor([0.2290, 0.2240, 0.2250])[None, :, None, None]
         # # if patch_feats == None:
@@ -223,9 +223,10 @@ class GNN_Diffusion(pl.LightningModule):
         patch_rgb: Tensor,
         edge_index: Tensor,
         patch_feats: Tensor,
+        batch,
     ) -> Any:
         return self.model.forward_with_feats(
-            xy_pos, time, patch_rgb, edge_index, patch_feats
+            xy_pos, time, patch_rgb, edge_index, patch_feats, batch
         )
         # mean = patch_rgb.new_tensor([0.4850, 0.4560, 0.4060])[None, :, None, None]
         # std = patch_rgb.new_tensor([0.2290, 0.2240, 0.2250])[None, :, None, None]
@@ -260,6 +261,7 @@ class GNN_Diffusion(pl.LightningModule):
 
     # forward diffusion
     def q_sample(self, x_start, t, noise=None):
+
         if noise is None:
             noise = torch.randn_like(x_start)
 
@@ -270,33 +272,40 @@ class GNN_Diffusion(pl.LightningModule):
 
         return sqrt_alphas_cumprod_t * x_start + sqrt_one_minus_alphas_cumprod_t * noise
 
-    def p_losses_old(self, x_start, t, noise=None, loss_type="l1", cond=None):
-        if noise is None:
-            noise = torch.randn_like(x_start)
+    # def p_losses_old(self, x_start, t, noise=None, loss_type="l1", cond=None):
+    #     if noise is None:
+    #         noise = torch.randn_like(x_start)
 
-        x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
-        predicted_noise = self(x_noisy, t, cond)
+    #     x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
+    #     predicted_noise = self(x_noisy, t, cond)
 
-        if loss_type == "l1":
-            loss = F.l1_loss(noise, predicted_noise)
-        elif loss_type == "l2":
-            loss = F.mse_loss(noise, predicted_noise)
-        elif loss_type == "huber":
-            loss = F.smooth_l1_loss(noise, predicted_noise)
-        else:
-            raise NotImplementedError()
+    #     if loss_type == "l1":
+    #         loss = F.l1_loss(noise, predicted_noise)
+    #     elif loss_type == "l2":
+    #         loss = F.mse_loss(noise, predicted_noise)
+    #     elif loss_type == "huber":
+    #         loss = F.smooth_l1_loss(noise, predicted_noise)
+    #     else:
+    #         raise NotImplementedError()
 
-        return loss
+    #     return loss
 
     def p_losses(
-        self, x_start, t, noise=None, loss_type="l1", cond=None, edge_index=None
+        self,
+        x_start,
+        t,
+        noise=None,
+        loss_type="l1",
+        cond=None,
+        edge_index=None,
+        batch=None,
     ):
 
         if noise is None:
             noise = torch.randn_like(x_start)
 
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
-        predicted_noise = self(x_noisy, t, cond, edge_index)
+        predicted_noise = self(x_noisy, t, cond, edge_index, batch)
 
         if loss_type == "l1":
             loss = F.l1_loss(noise, predicted_noise)
@@ -310,7 +319,7 @@ class GNN_Diffusion(pl.LightningModule):
         return loss
 
     @torch.no_grad()
-    def p_sample_ddpm(self, x, t, t_index, cond, edge_index, patch_feats):
+    def p_sample_ddpm(self, x, t, t_index, cond, edge_index, patch_feats,batch):
         betas_t = extract(self.betas, t, x.shape)
         sqrt_one_minus_alphas_cumprod_t = extract(
             self.sqrt_one_minus_alphas_cumprod, t, x.shape
@@ -322,7 +331,7 @@ class GNN_Diffusion(pl.LightningModule):
         model_mean = sqrt_recip_alphas_t * (
             x
             - betas_t
-            * self.forward_with_feats(x, t, cond, edge_index, patch_feats=patch_feats)
+            * self.forward_with_feats(x, t, cond, edge_index, patch_feats=patch_feats,batch=batch)
             / sqrt_one_minus_alphas_cumprod_t
         )
 
@@ -373,7 +382,7 @@ class GNN_Diffusion(pl.LightningModule):
 
     # Algorithm 2 but save all images:
     @torch.no_grad()
-    def p_sample_loop(self, shape, cond, edge_index):
+    def p_sample_loop(self, shape, cond, edge_index, batch):
         # device = next(model.parameters()).device
         device = self.device
 
@@ -402,6 +411,7 @@ class GNN_Diffusion(pl.LightningModule):
                 cond=cond,
                 edge_index=edge_index,
                 patch_feats=patch_feats,
+                batch=batch,
             )
             # imgs.append(img)
             # if i is not None:  # == 0:
@@ -420,15 +430,26 @@ class GNN_Diffusion(pl.LightningModule):
         return imgs
 
     @torch.no_grad()
-    def p_sample(self, x, t, t_index, cond, edge_index, sampling_func, patch_feats):
-        return sampling_func(x, t, t_index, cond, edge_index, patch_feats)
+    def p_sample(
+        self, x, t, t_index, cond, edge_index, sampling_func, patch_feats, batch
+    ):
+        return sampling_func(x, t, t_index, cond, edge_index, patch_feats, batch)
 
     @torch.no_grad()
-    def sample(self, image_size, batch_size=16, channels=3, cond=None, edge_index=None):
+    def sample(
+        self,
+        image_size,
+        batch_size=16,
+        channels=3,
+        cond=None,
+        edge_index=None,
+        batch=None,
+    ):
         return self.p_sample_loop(
             shape=(batch_size, channels, image_size, image_size),
             cond=cond,
             edge_index=edge_index,
+            batch=batch,
         )
 
     def configure_optimizers(self):
@@ -451,9 +472,12 @@ class GNN_Diffusion(pl.LightningModule):
             loss_type="huber",
             cond=batch.patches,
             edge_index=batch.edge_index,
+            batch=batch.batch,
         )
         if batch_idx % self.save_and_sample_every == 0 and self.local_rank == 0:
-            imgs = self.p_sample_loop(batch.x.shape, batch.patches, batch.edge_index)
+            imgs = self.p_sample_loop(
+                batch.x.shape, batch.patches, batch.edge_index, batch=batch.batch
+            )
             img = imgs[-1]
 
             save_path = Path(f"results/{self.logger.experiment.name}/train")
@@ -482,7 +506,7 @@ class GNN_Diffusion(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         with torch.no_grad():
 
-            imgs = self.p_sample_loop(batch.x.shape, batch.patches, batch.edge_index)
+            imgs = self.p_sample_loop(batch.x.shape, batch.patches, batch.edge_index,batch=batch.batch)
             img = imgs[-1]
 
             if self.local_rank == 0 and batch_idx < 5:
@@ -600,7 +624,7 @@ class GNN_Diffusion(pl.LightningModule):
         gt_img = self.create_image_from_patches(
             patches_rgb, gt_pos, n_patches=patches_dim, i=ind_name
         )
-        #assignement = greedy_cost_assignment(pos, gt_pos)
+        # assignement = greedy_cost_assignment(pos, gt_pos)
 
         pred_img = self.create_image_from_patches(
             patches_rgb, pos, n_patches=patches_dim, i=ind_name

@@ -7,7 +7,7 @@ import torch_geometric
 sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
 
 from dataset.puzzle_dataset import Puzzle_Dataset
-from dataset.wikiart_dt import Wikiart_DT#, Wikiart_DT_pytables
+from dataset.wikiart_dt import Wikiart_DT  # , Wikiart_DT_pytables
 from model.spatial_diffusion import GNN_Diffusion
 import argparse
 from torchvision.datasets import CelebA
@@ -50,7 +50,7 @@ def main(batch_size, gpus, steps, num_workers):
     )
 
     dl_train = torch_geometric.loader.DataLoader(
-        puzzleDt_train, batch_size=batch_size, num_workers=num_workers, shuffle=False
+        puzzleDt_train, batch_size=batch_size, num_workers=num_workers, shuffle=True
     )
     dl_test = torch_geometric.loader.DataLoader(
         puzzleDt_test, batch_size=batch_size, num_workers=num_workers, shuffle=False
@@ -91,7 +91,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
 
     # Add the arguments to the parser
-    ap.add_argument("-batch_size", type=int, default=12)
+    ap.add_argument("-batch_size", type=int, default=4)
     ap.add_argument("-gpus", type=int, default=1)
     ap.add_argument("-steps", type=int, default=300)
     ap.add_argument("-num_workers", type=int, default=8)

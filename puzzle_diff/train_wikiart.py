@@ -78,7 +78,7 @@ def main(batch_size, gpus, steps, num_workers):
         strategy="ddp" if gpus > 1 else None,
         # limit_val_batches=10,
         # limit_train_batches=10,
-        check_val_every_n_epoch=5,
+        check_val_every_n_epoch=10,
         logger=wandb_logger,
         callbacks=[checkpoint_callback, ModelSummary(max_depth=2)],
     )

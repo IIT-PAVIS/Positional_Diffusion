@@ -319,7 +319,7 @@ class GNN_Diffusion(pl.LightningModule):
         return loss
 
     @torch.no_grad()
-    def p_sample_ddpm(self, x, t, t_index, cond, edge_index, patch_feats,batch):
+    def p_sample_ddpm(self, x, t, t_index, cond, edge_index, patch_feats, batch):
         betas_t = extract(self.betas, t, x.shape)
         sqrt_one_minus_alphas_cumprod_t = extract(
             self.sqrt_one_minus_alphas_cumprod, t, x.shape
@@ -331,7 +331,9 @@ class GNN_Diffusion(pl.LightningModule):
         model_mean = sqrt_recip_alphas_t * (
             x
             - betas_t
-            * self.forward_with_feats(x, t, cond, edge_index, patch_feats=patch_feats,batch=batch)
+            * self.forward_with_feats(
+                x, t, cond, edge_index, patch_feats=patch_feats, batch=batch
+            )
             / sqrt_one_minus_alphas_cumprod_t
         )
 
@@ -506,7 +508,9 @@ class GNN_Diffusion(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         with torch.no_grad():
 
-            imgs = self.p_sample_loop(batch.x.shape, batch.patches, batch.edge_index,batch=batch.batch)
+            imgs = self.p_sample_loop(
+                batch.x.shape, batch.patches, batch.edge_index, batch=batch.batch
+            )
             img = imgs[-1]
 
             if self.local_rank == 0 and batch_idx < 5:

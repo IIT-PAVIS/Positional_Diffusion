@@ -62,6 +62,7 @@ class Eff_GAT(nn.Module):
         # patch_rgb.shape[0], -1
         # )
         # patch_feats = patch_feats
+
         patch_feats = self.visual_features(patch_rgb)
         final_feats = self.forward_with_feats(
             xy_pos, time, patch_rgb, edge_index, patch_feats=patch_feats, batch=batch
@@ -77,24 +78,21 @@ class Eff_GAT(nn.Module):
         patch_feats: Tensor,
         batch,
     ):
-        # mean = patch_rgb.new_tensor([0.4850, 0.4560, 0.4060])[None, :, None, None]
-        # std = patch_rgb.new_tensor([0.2290, 0.2240, 0.2250])[None, :, None, None]
-        # if patch_feats == None:
 
-        # patch_rgb = (patch_rgb - self.mean) / self.std
+        time_feats = self.time_emb(time)  # embedding, int -> 32
+        pos_feats = self.pos_mlp(xy_pos)  # MLP, (x, y) -> 32
 
-        # # fe[3].reshape(fe[0].shape[0],-1)
-        # patch_feats = self.visual_backbone.forward(patch_rgb)[3].reshape(
-        # patch_rgb.shape[0], -1
-        # )
-        # patch_feats = patch_feats
-        time_feats = self.time_emb(time)
-        pos_feats = self.pos_mlp(xy_pos)
+        # COMBINE  and transform with MLP
         combined_feats = torch.cat([patch_feats, pos_feats, time_feats], -1)
-        combined_feats = self.GN(combined_feats, batch=batch)
         combined_feats = self.mlp(combined_feats)
+
+        # GNN
         feats = self.gnn_backbone(x=combined_feats, edge_index=edge_index)
-        final_feats = self.final_mlp(feats + combined_feats)
+
+        # Residual + final transform
+        final_feats = self.final_mlp(
+            feats + combined_feats
+        )  # combined -> (err_x, err_y)
 
         return final_feats
 

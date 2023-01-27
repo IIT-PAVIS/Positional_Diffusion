@@ -111,8 +111,8 @@ def sigmoid_beta_schedule(timesteps):
 
 def extract(a, t, x_shape):
     batch_size = t.shape[0]
-    out = a.gather(-1, t.cpu())
-    return out.reshape(batch_size, *((1,) * (len(x_shape) - 1))).to(t.device)
+    out = a.gather(-1, t)
+    return out.reshape(batch_size, *((1,) * (len(x_shape) - 1)))
 
 
 import torch
@@ -184,22 +184,32 @@ class GNN_Diffusion(pl.LightningModule):
             self.eta = 0
 
         # define beta schedule
-        self.betas = linear_beta_schedule(timesteps=steps)
+        betas = linear_beta_schedule(timesteps=steps)
+        self.register_buffer("betas", betas)
         # self.betas = cosine_beta_schedule(timesteps=steps)
         # define alphas
-        self.alphas = 1.0 - self.betas
-        self.alphas_cumprod = torch.cumprod(self.alphas, axis=0)
-        self.alphas_cumprod_prev = F.pad(self.alphas_cumprod[:-1], (1, 0), value=1.0)
-        self.sqrt_recip_alphas = torch.sqrt(1.0 / self.alphas)
+        alphas = 1.0 - self.betas
+        self.register_buffer("alphas", alphas)
+        alphas_cumprod = torch.cumprod(self.alphas, axis=0)
+        self.register_buffer("alphas_cumprod", alphas_cumprod)
+        alphas_cumprod_prev = F.pad(self.alphas_cumprod[:-1], (1, 0), value=1.0)
+        self.register_buffer("alphas_cumprod_prev", alphas_cumprod_prev)
+        sqrt_recip_alphas = torch.sqrt(1.0 / self.alphas)
+        self.register_buffer("sqrt_recip_alphas", sqrt_recip_alphas)
 
         # calculations for diffusion q(x_t | x_{t-1}) and others
-        self.sqrt_alphas_cumprod = torch.sqrt(self.alphas_cumprod)
-        self.sqrt_one_minus_alphas_cumprod = torch.sqrt(1.0 - self.alphas_cumprod)
+        sqrt_alphas_cumprod = torch.sqrt(self.alphas_cumprod)
+        self.register_buffer("sqrt_alphas_cumprod", sqrt_alphas_cumprod)
+        sqrt_one_minus_alphas_cumprod = torch.sqrt(1.0 - self.alphas_cumprod)
+        self.register_buffer(
+            "sqrt_one_minus_alphas_cumprod", sqrt_one_minus_alphas_cumprod
+        )
 
         # calculations for posterior q(x_{t-1} | x_t, x_0)
-        self.posterior_variance = (
+        posterior_variance = (
             self.betas * (1.0 - self.alphas_cumprod_prev) / (1.0 - self.alphas_cumprod)
         )
+        self.register_buffer("posterior_variance", posterior_variance)
 
         self.steps = steps
         ### BACKBONE

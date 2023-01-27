@@ -57,7 +57,7 @@ def main(batch_size, gpus, steps, num_workers):
         puzzleDt_train, batch_size=batch_size, num_workers=num_workers, shuffle=True
     )
     dl_test = torch_geometric.loader.DataLoader(
-        puzzleDt_test, batch_size=batch_size, num_workers=num_workers, shuffle=False
+        puzzleDt_test, batch_size=batch_size, num_workers=num_workers, shuffle=True
     )
 
     # dl_train = dl_test  # TODO <----------------- CHANGE to train once debugging
@@ -93,8 +93,9 @@ def main(batch_size, gpus, steps, num_workers):
         strategy="ddp" if gpus > 1 else None,
         # limit_val_batches=10,
         # limit_train_batches=10,
+        limit_val_batches=0.20,
         # max_epochs=1,
-        check_val_every_n_epoch=20,
+        check_val_every_n_epoch=10,
         logger=wandb_logger,
         # accumulate_grad_batches=10,
         # profiler=prof,

@@ -41,7 +41,7 @@ def main(batch_size, gpus, steps, num_workers):
         dataset=dt_train,
         dataset_get_fn=celeba_get_fn,
         patch_per_dim=[
-            (12, 12),
+            (10, 10),
         ],
     )
 
@@ -49,7 +49,7 @@ def main(batch_size, gpus, steps, num_workers):
         dataset=dt_test,
         dataset_get_fn=celeba_get_fn,
         patch_per_dim=[
-            (12, 12),
+            (10, 10),
         ],
     )
 
@@ -72,7 +72,7 @@ def main(batch_size, gpus, steps, num_workers):
     )
     model.initialize_torchmetrics(
         [
-            (12, 12),
+            (10, 10),
         ]
     )
 

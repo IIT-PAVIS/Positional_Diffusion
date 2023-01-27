@@ -41,7 +41,7 @@ def main(batch_size, gpus, steps, num_workers):
         dataset=dt_train,
         dataset_get_fn=celeba_get_fn,
         patch_per_dim=[
-            (6, 6),
+            (12, 12),
         ],
     )
 
@@ -49,7 +49,7 @@ def main(batch_size, gpus, steps, num_workers):
         dataset=dt_test,
         dataset_get_fn=celeba_get_fn,
         patch_per_dim=[
-            (6, 6),
+            (12, 12),
         ],
     )
 
@@ -65,11 +65,14 @@ def main(batch_size, gpus, steps, num_workers):
     save_and_sample_every = 20000  # math.floor(len(dl_train) / gpus / 4)
 
     model = GNN_Diffusion(
-        steps=steps, sampling="DDPM", save_and_sample_every=save_and_sample_every
+        steps=steps,
+        sampling="DDPM",
+        save_and_sample_every=save_and_sample_every,
+        # bb="DarkNet",
     )
     model.initialize_torchmetrics(
         [
-            (6, 6),
+            (12, 12),
         ]
     )
 
@@ -88,7 +91,7 @@ def main(batch_size, gpus, steps, num_workers):
         # limit_train_batches=10,
         check_val_every_n_epoch=5,
         logger=wandb_logger,
-        #accumulate_grad_batches=10,
+        # accumulate_grad_batches=10,
         callbacks=[checkpoint_callback, ModelSummary(max_depth=2)],
     )
     trainer.fit(model, dl_train, dl_test)
@@ -100,7 +103,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
 
     # Add the arguments to the parser
-    ap.add_argument("-batch_size", type=int, default=20)
+    ap.add_argument("-batch_size", type=int, default=4)
     ap.add_argument("-gpus", type=int, default=1)
     ap.add_argument("-steps", type=int, default=600)
     ap.add_argument("-num_workers", type=int, default=8)

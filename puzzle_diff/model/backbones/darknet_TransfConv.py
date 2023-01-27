@@ -51,7 +51,7 @@ class Dark_TFConv(nn.Module):
         self.register_buffer("mean", mean)
         self.register_buffer("std", std)
 
-    def forward(self, xy_pos, time, patch_rgb, edge_index):
+    def forward(self, xy_pos, time, patch_rgb, edge_index, batch):
 
         patch_rgb = (patch_rgb - self.mean) / self.std
 
@@ -76,6 +76,7 @@ class Dark_TFConv(nn.Module):
         patch_rgb: Tensor,
         edge_index: Tensor,
         patch_feats: Tensor,
+        batch=None,
     ):
         # mean = patch_rgb.new_tensor([0.4850, 0.4560, 0.4060])[None, :, None, None]
         # std = patch_rgb.new_tensor([0.2290, 0.2240, 0.2250])[None, :, None, None]

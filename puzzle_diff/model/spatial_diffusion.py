@@ -43,8 +43,30 @@ from PIL import Image
 import matplotlib
 import torchmetrics
 from .backbones import Dark_TFConv, Eff_GAT
+import colorsys
 
 matplotlib.use("agg")
+
+
+def interpolate_color1d(color1, color2, fraction):
+    # color1 = [float(x) / 255 for x in color1]
+    # color2 = [float(x) / 255 for x in color2]
+    hsv1 = color1  #  colorsys.rgb_to_hsv(*color1)
+    hsv2 = color2  #  colorsys.rgb_to_hsv(*color2)
+    h = hsv1[0] + (hsv2[0] - hsv1[0]) * fraction
+    s = hsv1[1] + (hsv2[1] - hsv1[1]) * fraction
+    v = hsv1[2] + (hsv2[2] - hsv1[2]) * fraction
+    return tuple(x for x in (h, s, v))
+
+
+def interpolate_color(
+    pos, col_1=(1, 0, 0), col_2=(1, 1, 0), col_3=(0, 0, 1), col_4=(0, 1, 0)
+):
+    f1 = float((pos[0] + 1) / 2)
+    f2 = float((pos[1] + 1) / 2)
+    c1 = interpolate_color1d(col_1, col_2, f1)
+    c2 = interpolate_color1d(col_3, col_4, f1)
+    return interpolate_color1d(c1, c2, f2)
 
 
 def num_to_groups(num, divisor):
@@ -143,6 +165,7 @@ class GNN_Diffusion(pl.LightningModule):
         sampling="DDPM",
         learning_rate=1e-4,
         save_and_sample_every=1000,
+        bb=None,
         *args,
         **kwargs,
     ) -> None:
@@ -180,7 +203,10 @@ class GNN_Diffusion(pl.LightningModule):
 
         self.steps = steps
         ### BACKBONE
-        self.model = Eff_GAT(steps=steps)
+        if bb == "DarkNet":
+            self.model = Dark_TFConv(steps=steps)
+        else:
+            self.model = Eff_GAT(steps=steps)
 
         self.save_hyperparameters()
 
@@ -633,12 +659,16 @@ class GNN_Diffusion(pl.LightningModule):
         pred_img = self.create_image_from_patches(
             patches_rgb, pos, n_patches=patches_dim, i=ind_name
         )
+        col = list(map(interpolate_color, gt_pos))
         ax[0, 0].imshow(gt_img)
         ax[0, 1].imshow(pred_img)
-        ax[1, 0].scatter(gt_pos[:, 0].cpu(), gt_pos[:, 1].cpu())
+        ax[1, 0].scatter(gt_pos[:, 0].cpu(), gt_pos[:, 1].cpu(), c=col)
+        ax[1, 0].invert_yaxis()
         ax[1, 0].set_aspect("equal")
 
-        ax[1, 1].scatter(pos[:, 0].cpu(), pos[:, 1].cpu())
+        ax[1, 1].scatter(pos[:, 0].cpu(), pos[:, 1].cpu(), c=col)
+
+        ax[1, 1].invert_yaxis()
         ax[1, 1].set_aspect("equal")
         ax[0, 0].set_title(f"{self.current_epoch}-{ind_name}")
 

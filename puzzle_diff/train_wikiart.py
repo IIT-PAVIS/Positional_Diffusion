@@ -77,11 +77,15 @@ def main(batch_size, gpus, steps, num_workers):
     )
 
     wandb_logger = WandbLogger(
-        project="Puzzle-Diff", settings=wandb.Settings(code_dir="."), offline=False
+        project="Puzzle-Diff", settings=wandb.Settings(code_dir="."), offline=True
     )
     checkpoint_callback = ModelCheckpoint(
         monitor="overall_acc", mode="max", save_top_k=2
     )
+
+    from pytorch_lightning.profiler import AdvancedProfiler
+
+    prof = AdvancedProfiler(filename="prof.txt")
 
     trainer = pl.Trainer(
         accelerator="gpu",
@@ -89,9 +93,11 @@ def main(batch_size, gpus, steps, num_workers):
         strategy="ddp" if gpus > 1 else None,
         # limit_val_batches=10,
         # limit_train_batches=10,
+        # max_epochs=1,
         check_val_every_n_epoch=5,
         logger=wandb_logger,
         # accumulate_grad_batches=10,
+        # profiler=prof,
         callbacks=[checkpoint_callback, ModelSummary(max_depth=2)],
     )
     trainer.fit(model, dl_train, dl_test)

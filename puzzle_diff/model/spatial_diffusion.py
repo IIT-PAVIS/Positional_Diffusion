@@ -112,7 +112,7 @@ def sigmoid_beta_schedule(timesteps):
 def extract(a, t, x_shape):
     batch_size = t.shape[0]
     out = a.gather(-1, t)
-    return out.reshape(batch_size, *((1,) * (len(x_shape) - 1)))
+    return out[:, None]  # out.reshape(batch_size, *((1,) * (len(x_shape) - 1)))
 
 
 import torch
@@ -437,6 +437,10 @@ class GNN_Diffusion(pl.LightningModule):
 
         patch_feats = self.visual_features(cond)
 
+        # time_t = torch.full((b,), i, device=device, dtype=torch.long)
+
+        time_t = torch.full((b,), 0, device=device, dtype=torch.long)
+
         for i in tqdm(
             reversed(range(0, self.steps)),
             desc="sampling loop time step",
@@ -444,7 +448,8 @@ class GNN_Diffusion(pl.LightningModule):
         ):
             img = self.p_sample(
                 img,
-                torch.full((b,), i, device=device, dtype=torch.long),
+                # torch.full((b,), i, device=device, dtype=torch.long),
+                time_t + i,
                 i,
                 cond=cond,
                 edge_index=edge_index,

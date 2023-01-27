@@ -3,7 +3,7 @@ import torch
 import timm
 from .Transformer_GNN import Transformer_GNN
 from torch import Tensor
-from torch_geometric.nn import GraphNorm
+from torch_geometric.nn import GraphNorm, GAT
 
 
 class Eff_GAT(nn.Module):
@@ -31,15 +31,22 @@ class Eff_GAT(nn.Module):
         #     num_layers=2,
         #     out_channels=self.combined_features_dim,
         # )
-        self.gnn_backbone = Transformer_GNN(
+        # self.gnn_backbone = Transformer_GNN(
+        # self.combined_features_dim,
+        # hidden_dim=32 * 8,
+        # heads=8,
+        # output_size=self.combined_features_dim,
+        # )
+        self.gnn_backbone = GAT(
             self.combined_features_dim,
-            hidden_dim=32 * 8,
-            heads=8,
-            output_size=self.combined_features_dim,
+            265,
+            num_layers=4,
+            out_channels=self.combined_features_dim,
         )
         self.time_emb = nn.Embedding(steps, 32)
         self.pos_mlp = nn.Sequential(nn.Linear(2, 16), nn.GELU(), nn.Linear(16, 32))
-        self.GN = GraphNorm(self.combined_features_dim)
+
+        # self.GN = GraphNorm(self.combined_features_dim)
         self.mlp = nn.Sequential(
             nn.Linear(self.combined_features_dim, 128),
             nn.GELU(),

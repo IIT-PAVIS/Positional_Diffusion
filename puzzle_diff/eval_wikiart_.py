@@ -1,4 +1,5 @@
 import argparse
+from functools import partial
 import sys, os
 from typing import Tuple
 
@@ -41,7 +42,7 @@ def main(batch_size, gpus, steps, num_workers):
         dataset=dt_train,
         dataset_get_fn=celeba_get_fn,
         patch_per_dim=[
-            (6, 6),
+            (12, 12),
         ],
     )
 
@@ -49,7 +50,7 @@ def main(batch_size, gpus, steps, num_workers):
         dataset=dt_test,
         dataset_get_fn=celeba_get_fn,
         patch_per_dim=[
-            (6, 6),
+            (12, 12),
         ],
     )
 
@@ -57,28 +58,29 @@ def main(batch_size, gpus, steps, num_workers):
         puzzleDt_train, batch_size=batch_size, num_workers=num_workers, shuffle=True
     )
     dl_test = torch_geometric.loader.DataLoader(
-        puzzleDt_test, batch_size=batch_size, num_workers=num_workers, shuffle=True
+        puzzleDt_test, batch_size=batch_size, num_workers=0, shuffle=False
     )
 
     # dl_train = dl_test  # TODO <----------------- CHANGE to train once debugging
 
     save_and_sample_every = 20000  # math.floor(len(dl_train) / gpus / 4)
 
-    model = GNN_Diffusion(
-        steps=steps,
-        sampling="DDIM",
-        inference_ratio=10,
-        save_and_sample_every=save_and_sample_every,
-        # bb="DarkNet",
-    )
+    # model = GNN_Diffusion(
+    # steps=steps,
+    # sampling="DDPM",
+    # save_and_sample_every=save_and_sample_every,
+    ## bb="DarkNet",
+    # )
+    model = GNN_Diffusion.load_from_checkpoint("epoch=89-step=93600.ckpt")
+
     model.initialize_torchmetrics(
         [
-            (6, 6),
+            (12, 12),
         ]
     )
 
     wandb_logger = WandbLogger(
-        project="Puzzle-Diff", settings=wandb.Settings(code_dir="."), offline=False
+        project="Puzzle-Diff", settings=wandb.Settings(code_dir="."), offline=True
     )
     checkpoint_callback = ModelCheckpoint(
         monitor="overall_acc", mode="max", save_top_k=2
@@ -86,7 +88,7 @@ def main(batch_size, gpus, steps, num_workers):
 
     from pytorch_lightning.profiler import AdvancedProfiler
 
-    # prof = AdvancedProfiler(filename="prof.txt")
+    prof = AdvancedProfiler(filename="prof_eval2.txt")
 
     trainer = pl.Trainer(
         accelerator="gpu",
@@ -96,13 +98,20 @@ def main(batch_size, gpus, steps, num_workers):
         # limit_train_batches=10,
         # limit_val_batches=0.20,
         # max_epochs=1,
-        check_val_every_n_epoch=5,
+        # check_val_every_n_epoch=10,
+        limit_test_batches=50,
         logger=wandb_logger,
         # accumulate_grad_batches=10,
-        # profiler=prof,
+        profiler=prof,
         callbacks=[checkpoint_callback, ModelSummary(max_depth=2)],
     )
-    trainer.fit(model, dl_train, dl_test)
+
+    # trainer.fit(model, dl_train, dl_test)
+
+    model.p_sample = partial(model.p_sample, sampling_func=model.p_sample_ddim)
+    model.eta = 0
+    model.inference_ratio = 10
+    trainer.test(model, dl_test)
 
     pass
 
@@ -111,7 +120,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
 
     # Add the arguments to the parser
-    ap.add_argument("-batch_size", type=int, default=4)
+    ap.add_argument("-batch_size", type=int, default=6)
     ap.add_argument("-gpus", type=int, default=1)
     ap.add_argument("-steps", type=int, default=600)
     ap.add_argument("-num_workers", type=int, default=8)

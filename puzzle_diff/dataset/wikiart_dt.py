@@ -18,6 +18,7 @@ class Wikiart_DT(Dataset):
             self.images = [img for img in all_images if img.name not in test_images_set]
         else:
             self.images = [img for img in all_images if img.name in test_images_set]
+        self.images=sorted(self.images)
 
     def __len__(self):
         return len(self.images)

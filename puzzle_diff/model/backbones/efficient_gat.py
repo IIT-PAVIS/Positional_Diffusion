@@ -39,7 +39,7 @@ class Eff_GAT(nn.Module):
         )
         self.time_emb = nn.Embedding(steps, 32)
         self.pos_mlp = nn.Sequential(nn.Linear(2, 16), nn.GELU(), nn.Linear(16, 32))
-        self.GN = GraphNorm(self.combined_features_dim)
+        # self.GN = GraphNorm(self.combined_features_dim)
         self.mlp = nn.Sequential(
             nn.Linear(self.combined_features_dim, 128),
             nn.GELU(),

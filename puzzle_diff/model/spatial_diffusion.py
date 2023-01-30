@@ -109,7 +109,7 @@ def sigmoid_beta_schedule(timesteps):
     return torch.sigmoid(betas) * (beta_end - beta_start) + beta_start
 
 
-def extract(a, t, x_shape):
+def extract(a, t, x_shape=None):
     batch_size = t.shape[0]
     out = a.gather(-1, t)
     return out[:, None]  # out.reshape(batch_size, *((1,) * (len(x_shape) - 1)))
@@ -118,7 +118,7 @@ def extract(a, t, x_shape):
 import torch
 
 
-@torch.jit.script
+# @torch.jit.script
 def greedy_cost_assignment(pos1: torch.Tensor, pos2: torch.Tensor) -> torch.Tensor:
     # Compute pairwise distances between positions
     dist = torch.norm(pos1[:, None] - pos2, dim=2)
@@ -162,6 +162,7 @@ class GNN_Diffusion(pl.LightningModule):
     def __init__(
         self,
         steps=600,
+        inference_ratio=1,
         sampling="DDPM",
         learning_rate=1e-4,
         save_and_sample_every=1000,
@@ -177,14 +178,23 @@ class GNN_Diffusion(pl.LightningModule):
         ### DIFFUSION STUFF
 
         if sampling == "DDPM":
-            self.p_sample = partial(self.p_sample, sampling_func=self.p_sample_ddpm)
+            self.inference_ratio = 1
+            self.p_sample = partial(
+                self.p_sample,
+                sampling_func=self.p_sample_ddpm,
+            )
             self.eta = 1
         elif sampling == "DDIM":
-            self.p_sample = partial(self.p_sample, sampling_func=self.p_sample_ddim)
+            self.inference_ratio = inference_ratio
+            self.p_sample = partial(
+                self.p_sample,
+                sampling_func=self.p_sample_ddim,
+            )
             self.eta = 0
 
         # define beta schedule
         betas = linear_beta_schedule(timesteps=steps)
+        self.timesteps = torch.arange(0, 700).flip(0)
         self.register_buffer("betas", betas)
         # self.betas = cosine_beta_schedule(timesteps=steps)
         # define alphas
@@ -381,26 +391,71 @@ class GNN_Diffusion(pl.LightningModule):
             # Algorithm 2 line 4:
             return model_mean + torch.sqrt(posterior_variance_t) * noise
 
+    def _get_variance_old(self, timestep, prev_timestep):
+        alpha_prod_t = self.alphas_cumprod[timestep]
+        alpha_prod_t_prev = (
+            self.alphas_cumprod[prev_timestep]
+            if prev_timestep >= 0
+            else self.final_alpha_cumprod
+        )
+        beta_prod_t = 1 - alpha_prod_t
+        beta_prod_t_prev = 1 - alpha_prod_t_prev
+
+        variance = (beta_prod_t_prev / beta_prod_t) * (
+            1 - alpha_prod_t / alpha_prod_t_prev
+        )
+
+        return variance
+
+    def _get_variance(self, timestep, prev_timestep):
+        alpha_prod_t = extract(
+            self.alphas_cumprod, timestep
+        )  # self.alphas_cumprod[timestep]
+
+        alpha_prod_t_prev = (
+            extract(self.alphas_cumprod, prev_timestep)
+            if (prev_timestep >= 0).all()
+            else alpha_prod_t * 0 + 1
+        )
+
+        beta_prod_t = 1 - alpha_prod_t
+        beta_prod_t_prev = 1 - alpha_prod_t_prev
+
+        variance = (beta_prod_t_prev / beta_prod_t) * (
+            1 - alpha_prod_t / alpha_prod_t_prev
+        )
+
+        return variance
+
     @torch.no_grad()
-    def p_sample_ddim(self, x, t, t_index, cond):
-        if t[0] == 0:
-            return x
+    def p_sample_ddim(
+        self, x, t, t_index, cond, edge_index, patch_feats, batch
+    ):  # (self, x, t, t_index, cond):
+        # if t[0] == 0:
+        #     return x
+
+        prev_timestep = t - self.inference_ratio
 
         eta = self.eta
         alpha_prod = extract(self.alphas_cumprod, t, x.shape)
 
-        if (t[0] - 1) == 0:
-            alpha_prod_prev = alpha_prod * 0 + 1
+        if (prev_timestep >= 0).all():
+            alpha_prod_prev = extract(self.alphas_cumprod, prev_timestep, x.shape)
         else:
-            alpha_prod_prev = extract(self.alphas_cumprod, t - 1, x.shape)
+            alpha_prod_prev = alpha_prod * 0 + 1
+
         beta = 1 - alpha_prod
         beta_prev = 1 - alpha_prod_prev
 
-        model_output = self(x, t, cond)
+        model_output = self.forward_with_feats(
+            x, t, cond, edge_index, patch_feats=patch_feats, batch=batch
+        )
 
         # estimate x    _0
         x_0 = (x - beta**0.5 * model_output) / alpha_prod**0.5
-        variance = (beta_prev / beta) * (1 - alpha_prod / alpha_prod_prev)
+        variance = self._get_variance(
+            t, prev_timestep
+        )  # (beta_prev / beta) * (1 - alpha_prod / alpha_prod_prev)
         std_eta = eta * variance**0.5
 
         # estimate "direction to x_t"
@@ -442,9 +497,8 @@ class GNN_Diffusion(pl.LightningModule):
         time_t = torch.full((b,), 0, device=device, dtype=torch.long)
 
         for i in tqdm(
-            reversed(range(0, self.steps)),
+            list(reversed(range(0, self.steps, self.inference_ratio))),
             desc="sampling loop time step",
-            total=self.steps,
         ):
             img = self.p_sample(
                 img,
@@ -517,7 +571,7 @@ class GNN_Diffusion(pl.LightningModule):
             edge_index=batch.edge_index,
             batch=batch.batch,
         )
-        if batch_idx % self.save_and_sample_every == 0 and self.local_rank == 0:
+        if batch_idx == 0 and self.local_rank == 0:
             imgs = self.p_sample_loop(
                 batch.x.shape, batch.patches, batch.edge_index, batch=batch.batch
             )
@@ -554,7 +608,7 @@ class GNN_Diffusion(pl.LightningModule):
             )
             img = imgs[-1]
 
-            if self.local_rank == 0 and batch_idx < 5:
+            if self.local_rank == 0 and batch_idx < 10:
                 save_path = Path(f"results/{self.logger.experiment.name}/val")
                 for i in range(
                     min(batch.batch.max().item(), 4)
@@ -605,6 +659,12 @@ class GNN_Diffusion(pl.LightningModule):
 
     def validation_epoch_end(self, outputs) -> None:
         self.log_dict(self.metrics)
+
+    def test_epoch_end(self, outputs) -> None:
+        return self.validation_epoch_end(outputs)
+
+    def test_step(self, batch, batch_idx):
+        return self.validation_step(batch, batch_idx)
         # all_outs = self.all_gather(outputs)
 
         ## mean = torch.mean(all_outs)

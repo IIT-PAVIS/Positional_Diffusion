@@ -41,7 +41,7 @@ def main(batch_size, gpus, steps, num_workers):
         dataset=dt_train,
         dataset_get_fn=celeba_get_fn,
         patch_per_dim=[
-            (12, 12),
+            (6, 6),
         ],
     )
 
@@ -49,7 +49,7 @@ def main(batch_size, gpus, steps, num_workers):
         dataset=dt_test,
         dataset_get_fn=celeba_get_fn,
         patch_per_dim=[
-            (12, 12),
+            (6, 6),
         ],
     )
 
@@ -72,7 +72,7 @@ def main(batch_size, gpus, steps, num_workers):
     )
     model.initialize_torchmetrics(
         [
-            (12, 12),
+            (6, 6),
         ]
     )
 
@@ -93,7 +93,7 @@ def main(batch_size, gpus, steps, num_workers):
         strategy="ddp" if gpus > 1 else None,
         # limit_val_batches=10,
         # limit_train_batches=10,
-        limit_val_batches=0.20,
+        # limit_val_batches=0.20,
         # max_epochs=1,
         check_val_every_n_epoch=10,
         logger=wandb_logger,

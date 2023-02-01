@@ -97,7 +97,7 @@ if __name__ == "__main__":
         "-dataset", default="celeba", choices=["celeba", "wikiart", "cifar100"]
     )
     ap.add_argument("-sampling", default="DDIM", choices=["DDPM", "DDIM"])
-    ap.add_argument("-inference_ratio", default=10)
+    ap.add_argument("-inference_ratio", type=int, default=10)
     ap.add_argument(
         "-puzzle_sizes", nargs="+", default=[6], type=int, help="Input a list of values"
     )

@@ -2,7 +2,8 @@ lightning_logs/
 results/
 Puzzle-Diff/
 /dataset/
-/datasets/
+/datasets/*
+!/datasets/data_splits
 dataset_old_delete/
 .vscode/
 wandb/

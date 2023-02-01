@@ -1,5 +1,5 @@
 from .puzzle_dataset import Puzzle_Dataset, Puzzle_Dataset_MP
-from torchvision.datasets import CelebA
+from .celeba_dt import CelebA_HQ
 from torchvision.datasets import CIFAR100
 from .wikiart_dt import Wikiart_DT
 
@@ -34,8 +34,8 @@ def get_dataset(dataset: str, puzzle_sizes: list) -> tuple:
 
     # Load the specified dataset
     if dataset == "celeba":
-        train_dt = CelebA(root="./datasets", download=True, split="train")
-        test_dt = CelebA(root="./datasets", download=True, split="test")
+        train_dt = CelebA_HQ(train=True)
+        test_dt = CelebA_HQ(train=False)
     elif dataset == "cifar100":
         train_dt = CIFAR100(root="./datasets", download=True, train=True)
         test_dt = CIFAR100(root="./datasets", download=True, train=False)
@@ -88,8 +88,8 @@ def get_dataset_missing_pieces(
 
     # Load the specified dataset
     if dataset == "celeba":
-        train_dt = CelebA(root="./datasets", download=True, split="train")
-        test_dt = CelebA(root="./datasets", download=True, split="test")
+        train_dt = CelebA_HQ(train=True)
+        test_dt = CelebA_HQ(train=False)
     elif dataset == "cifar100":
         train_dt = CIFAR100(root="./datasets", download=True, train=True)
         test_dt = CIFAR100(root="./datasets", download=True, train=False)

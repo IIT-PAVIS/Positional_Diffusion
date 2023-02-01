@@ -7,12 +7,14 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 # import tables as tb
 
 
-class Wikiart_DT(Dataset):
+class CelebA_HQ(Dataset):
     def __init__(self, train=True) -> None:
         super().__init__()
-        all_images = set(list(Path("datasets/wikiart").glob("*/*.jpg")))
-        train_file = Path("datasets/data_splits/wikiart_subset_train.txt")
-        test_file = Path("datasets/data_splits/wikiart_subset_test.txt")
+        all_images = set(
+            list(Path("datasets/CelebAMask-HQ/CelebA-HQ-img").glob("*.jpg"))
+        )
+        train_file = Path("datasets/data_splits/CelebA-HQ_train.txt")
+        test_file = Path("datasets/data_splits/CelebA-HQ_test.txt")
 
         with open(train_file, "r") as f:
             train_images_set = set([x.rstrip() for x in f.readlines()])

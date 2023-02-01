@@ -127,7 +127,7 @@ def greedy_cost_assignment(pos1: torch.Tensor, pos2: torch.Tensor) -> torch.Tens
     assignments = torch.zeros(dist.size(0), 3, dtype=torch.int64)
 
     # Create a mask to keep track of assigned positions
-    mask = torch.ones_like(dist, dtype=torch.uint8)
+    mask = torch.ones_like(dist, dtype=torch.bool)
 
     # Counter for keeping track of the number of assignments
     counter = 0
@@ -637,20 +637,32 @@ class GNN_Diffusion(pl.LightningModule):
                 n_patches = batch.patches_dim[i].tolist()
                 i_name = batch.ind_name[i]
 
-                assignement = greedy_cost_assignment(gt_pos, pos)
+                y = torch.linspace(-1, 1, n_patches[0], device=self.device)
+                x = torch.linspace(-1, 1, n_patches[1], device=self.device)
+                xy = torch.stack(torch.meshgrid(x, y, indexing="xy"), -1)
+                real_grid = einops.rearrange(xy, "x y c-> (x y) c")
+
+                gt_ass = greedy_cost_assignment(gt_pos, real_grid)
+                sort_idx = torch.sort(gt_ass[:, 0])[1]
+                gt_ass = gt_ass[sort_idx]
+
+                pred_ass = greedy_cost_assignment(pos, real_grid)
+                sort_idx = torch.sort(pred_ass[:, 0])[1]
+                pred_ass = pred_ass[sort_idx]
+
+                # assignement = greedy_cost_assignment(gt_pos, pos)
 
                 # self.num_images+=1
 
                 self.metrics[f"{tuple(n_patches)}_nImages"].update(1)
                 self.metrics["overall_nImages"].update(1)
-                if (assignement[:, 0] == assignement[:, 1]).all():
+                if (gt_ass[:, 1] == pred_ass[:, 1]).all():
                     self.metrics[f"{tuple(n_patches)}_acc"].update(1)
                     self.metrics["overall_acc"].update(1)
                     # accuracy_dict[tuple(n_patches)].append(1)
                 else:
 
                     self.metrics[f"{tuple(n_patches)}_acc"].update(0)
-
                     self.metrics["overall_acc"].update(0)
                     # accuracy_dict[tuple(n_patches)].append(0)
 

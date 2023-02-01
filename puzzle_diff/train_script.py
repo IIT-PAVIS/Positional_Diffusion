@@ -94,7 +94,7 @@ if __name__ == "__main__":
     ap.add_argument("-steps", type=int, default=300)
     ap.add_argument("-num_workers", type=int, default=8)
     ap.add_argument(
-        "-dataset", default="celeba", choices=["celeba", "wikiart", "cifar100"]
+        "-dataset", default="wikiart", choices=["celeba", "wikiart", "cifar100"]
     )
     ap.add_argument("-sampling", default="DDIM", choices=["DDPM", "DDIM"])
     ap.add_argument("-inference_ratio", type=int, default=10)

@@ -8,6 +8,7 @@ import einops
 import torch
 from torch import Tensor
 import random
+import math
 
 
 @torch.jit.script
@@ -113,7 +114,7 @@ class Puzzle_Dataset_MP(Puzzle_Dataset):
         patches = einops.rearrange(patches, "x y c k1 k2 -> (x y) c k1 k2")
 
         num_pieces = xy.shape[0]
-        pieces_to_remove = num_pieces // self.missing_pieces_perc
+        pieces_to_remove = math.ceil(num_pieces * self.missing_pieces_perc / 100)
 
         perm = list(range(num_pieces))
 

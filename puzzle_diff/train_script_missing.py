@@ -33,7 +33,7 @@ def main(
     ### Define dataset
 
     train_dt, test_dt, puzzle_sizes = get_dataset_missing_pieces(
-        dataset=dataset, puzzle_sizes=puzzle_sizes
+        dataset=dataset, puzzle_sizes=puzzle_sizes, missing_pieces_perc=30
     )
 
     dl_train = torch_geometric.loader.DataLoader(

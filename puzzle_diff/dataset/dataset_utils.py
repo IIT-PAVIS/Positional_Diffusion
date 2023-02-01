@@ -58,7 +58,9 @@ def get_dataset(dataset: str, puzzle_sizes: list) -> tuple:
     return (puzzleDt_train, puzzleDt_test, real_puzzle_sizes)
 
 
-def get_dataset_missing_pieces(dataset: str, puzzle_sizes: list) -> tuple:
+def get_dataset_missing_pieces(
+    dataset: str, puzzle_sizes: list, missing_pieces_perc: int
+) -> tuple:
     """
     Get dataset of images based on specified dataset name and puzzle sizes.
 
@@ -100,13 +102,13 @@ def get_dataset_missing_pieces(dataset: str, puzzle_sizes: list) -> tuple:
         dataset=train_dt,
         dataset_get_fn=get_fn,
         patch_per_dim=real_puzzle_sizes,
-        missing_perc=10,
+        missing_perc=missing_pieces_perc,
     )
     puzzleDt_test = Puzzle_Dataset_MP(
         dataset=test_dt,
         dataset_get_fn=get_fn,
         patch_per_dim=real_puzzle_sizes,
-        missing_perc=10,
+        missing_perc=missing_pieces_perc,
     )
 
     return (puzzleDt_train, puzzleDt_test, real_puzzle_sizes)

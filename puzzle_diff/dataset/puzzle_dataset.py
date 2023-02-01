@@ -7,6 +7,7 @@ import torchvision.transforms as transforms
 import einops
 import torch
 from torch import Tensor
+import random
 
 
 @torch.jit.script
@@ -59,12 +60,70 @@ class Puzzle_Dataset(pyg_data.Dataset):
 
         img = self.transforms(img)
         xy, patches = divide_images_into_patches(img, patch_per_dim, self.patch_size)
+
+        xy = einops.rearrange(xy, "x y c -> (x y) c")
+        patches = einops.rearrange(patches, "x y c k1 k2 -> (x y) c k1 k2")
+
         adj_mat = torch.ones(
             patch_per_dim[0] * patch_per_dim[1], patch_per_dim[0] * patch_per_dim[1]
         )
         edge_index, edge_attr = pyg.utils.dense_to_sparse(adj_mat)
+        data = pyg_data.Data(
+            x=xy,
+            patches=patches,
+            edge_index=edge_index,
+            ind_name=torch.tensor([idx]).long(),
+            patches_dim=torch.tensor([patch_per_dim]),
+        )
+        return data
+
+
+class Puzzle_Dataset_MP(Puzzle_Dataset):
+    def __init__(
+        self,
+        dataset=None,
+        dataset_get_fn=None,
+        patch_per_dim=[(7, 6)],
+        patch_size=32,
+        missing_perc=10,
+    ) -> None:
+        super().__init__(
+            dataset=dataset,
+            dataset_get_fn=dataset_get_fn,
+            patch_per_dim=patch_per_dim,
+            patch_size=patch_size,
+        )
+        self.missing_pieces_perc = missing_perc
+
+    def get(self, idx):
+        if self.dataset is not None:
+            img = self.dataset_get_fn(self.dataset[idx])
+
+        rdim = torch.randint(len(self.patch_per_dim), size=(1,)).item()
+        patch_per_dim = self.patch_per_dim[rdim]
+
+        height = patch_per_dim[0] * self.patch_size
+        width = patch_per_dim[1] * self.patch_size
+        img = img.resize((width, height))
+
+        img = self.transforms(img)
+        xy, patches = divide_images_into_patches(img, patch_per_dim, self.patch_size)
+
         xy = einops.rearrange(xy, "x y c -> (x y) c")
         patches = einops.rearrange(patches, "x y c k1 k2 -> (x y) c k1 k2")
+
+        num_pieces = xy.shape[0]
+        pieces_to_remove = num_pieces // self.missing_pieces_perc
+
+        perm = list(range(num_pieces))
+
+        random.shuffle(perm)
+        perm = perm[: num_pieces - pieces_to_remove]
+        xy = xy[perm]
+        patches = patches[perm]
+
+        adj_mat = torch.ones(xy.shape[0], xy.shape[0])
+        edge_index, edge_attr = pyg.utils.dense_to_sparse(adj_mat)
         data = pyg_data.Data(
             x=xy,
             patches=patches,

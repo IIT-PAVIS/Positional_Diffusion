@@ -2,7 +2,6 @@
 
 
 # Request 1 chunk of 20 cores and 4 gpus.
-#PBS -l select=1:ncpus=8:ngpus=3
 #PBS -l walltime=24:00:00 
 
 # Merge the error and output streams into a single file.

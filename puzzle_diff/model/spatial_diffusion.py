@@ -581,7 +581,6 @@ class GNN_Diffusion(pl.LightningModule):
             for i in range(
                 min(batch.batch.max().item(), 4)
             ):  # save max 4 images during training loop
-                fig, ax = plt.subplots(2, 2)
                 idx = torch.where(batch.batch == i)[0]
                 patches_rgb = batch.patches[idx]
                 gt_pos = batch.x[idx]
@@ -596,6 +595,7 @@ class GNN_Diffusion(pl.LightningModule):
                     ind_name=i_name,
                     file_name=save_path,
                 )
+
         self.log("loss", loss)
 
         return loss

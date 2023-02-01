@@ -42,7 +42,7 @@ def main(batch_size, gpus, steps, num_workers):
         dataset=dt_train,
         dataset_get_fn=celeba_get_fn,
         patch_per_dim=[
-            (12, 12),
+            (6, 6),
         ],
     )
 
@@ -71,7 +71,7 @@ def main(batch_size, gpus, steps, num_workers):
     # save_and_sample_every=save_and_sample_every,
     ## bb="DarkNet",
     # )
-    model = GNN_Diffusion.load_from_checkpoint("epoch=89-step=93600.ckpt")
+    model = GNN_Diffusion.load_from_checkpoint("epoch=269-step=193050.ckpt")
 
     model.initialize_torchmetrics(
         [
@@ -99,7 +99,7 @@ def main(batch_size, gpus, steps, num_workers):
         # limit_val_batches=0.20,
         # max_epochs=1,
         # check_val_every_n_epoch=10,
-        limit_test_batches=50,
+        # limit_test_batches=50,
         logger=wandb_logger,
         # accumulate_grad_batches=10,
         profiler=prof,
@@ -108,9 +108,13 @@ def main(batch_size, gpus, steps, num_workers):
 
     # trainer.fit(model, dl_train, dl_test)
 
-    model.p_sample = partial(model.p_sample, sampling_func=model.p_sample_ddim)
-    model.eta = 0
-    model.inference_ratio = 10
+    model.p_sample = partial(model.p_sample, sampling_func=model.p_sample_ddpm)
+    model.eta = 1
+    model.inference_ratio = 1
+
+    # model.p_sample = partial(model.p_sample, sampling_func=model.p_sample_ddim)
+    # model.eta = 0
+    # model.inference_ratio = 10
     trainer.test(model, dl_test)
 
     pass
@@ -120,7 +124,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
 
     # Add the arguments to the parser
-    ap.add_argument("-batch_size", type=int, default=6)
+    ap.add_argument("-batch_size", type=int, default=8)
     ap.add_argument("-gpus", type=int, default=1)
     ap.add_argument("-steps", type=int, default=600)
     ap.add_argument("-num_workers", type=int, default=8)

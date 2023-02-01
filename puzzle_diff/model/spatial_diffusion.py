@@ -118,7 +118,7 @@ def extract(a, t, x_shape=None):
 import torch
 
 
-# @torch.jit.script
+@torch.jit.script
 def greedy_cost_assignment(pos1: torch.Tensor, pos2: torch.Tensor) -> torch.Tensor:
     # Compute pairwise distances between positions
     dist = torch.norm(pos1[:, None] - pos2, dim=2)

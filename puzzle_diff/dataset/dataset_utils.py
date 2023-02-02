@@ -48,6 +48,7 @@ def get_dataset(dataset: str, puzzle_sizes: list) -> tuple:
         dataset=train_dt,
         dataset_get_fn=get_fn,
         patch_per_dim=real_puzzle_sizes,
+        train=True,
     )
     puzzleDt_test = Puzzle_Dataset(
         dataset=test_dt,
@@ -103,6 +104,7 @@ def get_dataset_missing_pieces(
         dataset_get_fn=get_fn,
         patch_per_dim=real_puzzle_sizes,
         missing_perc=missing_pieces_perc,
+        train=True,
     )
     puzzleDt_test = Puzzle_Dataset_MP(
         dataset=test_dt,
@@ -117,7 +119,6 @@ def get_dataset_missing_pieces(
 def get_dataset_old(
     dataset: str, puzzle_sizes: list
 ) -> tuple[Puzzle_Dataset, Puzzle_Dataset, list]:
-
     assert (
         dataset in ALLOWED_DT
     ), f"dataset {dataset} not supported, need to be one of {ALLOWED_DT}"
@@ -127,7 +128,6 @@ def get_dataset_old(
     get_fn = lambda x: x[0]
 
     if dataset == "celeba":
-
         train_dt = CelebA(
             root="./datasets",
             download=True,
@@ -141,7 +141,6 @@ def get_dataset_old(
         )
 
     if dataset == "cifar100":
-
         train_dt = CIFAR100(
             root="./datasets",
             download=True,
@@ -151,7 +150,6 @@ def get_dataset_old(
         test_dt = CIFAR100(root="./datasets", download=True, train=False)
 
     if dataset == "wikiart":
-
         train_dt = Wikiart_DT(train=True)
         test_dt = Wikiart_DT(train=False)
 

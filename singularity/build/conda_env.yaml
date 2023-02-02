@@ -1,4 +1,4 @@
-name: diffPYG
+name: diffPYG_sing
 channels:
   - pytorch
   - conda-forge
@@ -19,3 +19,4 @@ dependencies:
   - wandb
   - transformers
   - timm
+  - albumentations

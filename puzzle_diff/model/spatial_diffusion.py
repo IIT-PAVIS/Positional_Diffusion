@@ -478,7 +478,7 @@ class GNN_Diffusion(pl.LightningModule):
 
         b = shape[0]
         # start from pure noise (for each example in the batch)
-        img = torch.randn(shape, device=device) * 0
+        img = torch.randn(shape, device=device)
         # img = einops.rearrange(
         #     img,
         #     "b c (w1 w) (h1 h) -> b (w1 h1) c w h",
@@ -644,15 +644,14 @@ class GNN_Diffusion(pl.LightningModule):
                 sort_idx = torch.sort(pred_ass[:, 0])[1]
                 pred_ass = pred_ass[sort_idx]
 
-                assignement = greedy_cost_assignment(gt_pos, pos)
+                # assignement = greedy_cost_assignment(gt_pos, pos)
 
                 # self.num_images += 1
 
                 self.metrics[f"{tuple(n_patches)}_nImages"].update(1)
                 self.metrics["overall_nImages"].update(1)
-                # if (gt_ass[:, 1] == pred_ass[:, 1]).all():
-
-                if (assignement[:, 0] == assignement[:, 1]).all():
+                if (gt_ass[:, 1] == pred_ass[:, 1]).all():
+                    # if (assignement[:, 0] == assignement[:, 1]).all():
                     self.metrics[f"{tuple(n_patches)}_acc"].update(1)
                     self.metrics["overall_acc"].update(1)
                     # accuracy_dict[tuple(n_patches)].append(1)

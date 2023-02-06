@@ -38,7 +38,7 @@ def main(
     )
 
     # model = GNN_Diffusion.load_from_checkpoint("epoch=539-step=135000.ckpt")
-    model = GNN_Diffusion.load_from_checkpoint("epoch=529-step=132500.ckpt")
+    model = GNN_Diffusion.load_from_checkpoint("epoch=659-step=165000.ckpt")
     model.initialize_torchmetrics(puzzle_sizes)
 
     ### define training
@@ -81,7 +81,7 @@ if __name__ == "__main__":
     ap.add_argument("-sampling", default="DDIM", choices=["DDPM", "DDIM"])
     ap.add_argument("-inference_ratio", type=int, default=10)
     ap.add_argument(
-        "-puzzle_sizes", nargs="+", default=[8], type=int, help="Input a list of values"
+        "-puzzle_sizes", nargs="+", default=[6], type=int, help="Input a list of values"
     )
     ap.add_argument("--offline", action="store_true", default=False)
 

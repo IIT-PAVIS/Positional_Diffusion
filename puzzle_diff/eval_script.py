@@ -15,18 +15,7 @@ from pytorch_lightning.loggers import WandbLogger
 import wandb
 
 
-from dataset.dataset_utils import get_dataset_missing_pieces
-
-import random
-import string
-
-
-def get_random_string(length):
-    # choose from all lowercase letter
-    letters = string.ascii_lowercase
-    result_str = "".join(random.choice(letters) for i in range(length))
-    return result_str
-    # print("Random string of length", length, "is:", result_str)
+from dataset.dataset_utils import get_dataset
 
 
 def main(
@@ -42,59 +31,40 @@ def main(
 ):
     ### Define dataset
 
-    train_dt, test_dt, puzzle_sizes = get_dataset_missing_pieces(
-        dataset=dataset, puzzle_sizes=puzzle_sizes, missing_pieces_perc=30
-    )
+    _, test_dt, puzzle_sizes = get_dataset(dataset=dataset, puzzle_sizes=puzzle_sizes)
 
-    dl_train = torch_geometric.loader.DataLoader(
-        train_dt, batch_size=batch_size, num_workers=num_workers, shuffle=False
-    )
     dl_test = torch_geometric.loader.DataLoader(
         test_dt, batch_size=batch_size, num_workers=num_workers, shuffle=False
     )
 
-    ## DEFINE MODEL
-    if sampling == "DDPM":
-        inference_ratio = 1
-
-    model = GNN_Diffusion(
-        steps=steps,
-        sampling=sampling,
-        inference_ratio=inference_ratio,
-    )
+    # model = GNN_Diffusion.load_from_checkpoint("epoch=539-step=135000.ckpt")
+    model = GNN_Diffusion.load_from_checkpoint("epoch=529-step=132500.ckpt")
     model.initialize_torchmetrics(puzzle_sizes)
 
     ### define training
 
     franklin = True if gpus > 1 else False
 
-    experiment_name = (
-        f"MissingPieces-{dataset}-{puzzle_sizes}-{steps}-{get_random_string(6)}"
-    )
+    experiment_name = f"{dataset}-{puzzle_sizes}"
 
     tags = [f"{dataset}", f'{"franklin" if franklin else "fisso"}', "train"]
 
     wandb_logger = WandbLogger(
         project="Puzzle-Diff",
         settings=wandb.Settings(code_dir="."),
-        offline=offline,
+        offline=True,
         name=experiment_name,
         tags=tags,
-    )
-
-    checkpoint_callback = ModelCheckpoint(
-        monitor="overall_acc", mode="max", save_top_k=2
     )
 
     trainer = pl.Trainer(
         accelerator="gpu",
         devices=gpus,
         strategy="ddp" if gpus > 1 else None,
-        check_val_every_n_epoch=5,
         logger=wandb_logger,
-        callbacks=[checkpoint_callback, ModelSummary(max_depth=2)],
+        callbacks=[ModelSummary(max_depth=2)],
     )
-    trainer.fit(model, dl_train, dl_test)
+    trainer.test(model, dl_test)
 
 
 if __name__ == "__main__":
@@ -111,7 +81,7 @@ if __name__ == "__main__":
     ap.add_argument("-sampling", default="DDIM", choices=["DDPM", "DDIM"])
     ap.add_argument("-inference_ratio", type=int, default=10)
     ap.add_argument(
-        "-puzzle_sizes", nargs="+", default=[6], type=int, help="Input a list of values"
+        "-puzzle_sizes", nargs="+", default=[8], type=int, help="Input a list of values"
     )
     ap.add_argument("--offline", action="store_true", default=False)
 

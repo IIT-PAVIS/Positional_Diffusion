@@ -17,6 +17,16 @@ import wandb
 
 from dataset.dataset_utils import get_dataset
 
+import random
+import string
+
+
+def get_random_string(length):
+    # choose from all lowercase letter
+    letters = string.ascii_lowercase
+    result_str = "".join(random.choice(letters) for i in range(length))
+    return result_str  # print("Random string of length", length, "is:", result_str)
+
 
 def main(
     batch_size,
@@ -29,7 +39,6 @@ def main(
     inference_ratio,
     offline,
 ):
-
     ### Define dataset
 
     train_dt, test_dt, puzzle_sizes = get_dataset(
@@ -58,7 +67,7 @@ def main(
 
     franklin = True if gpus > 1 else False
 
-    experiment_name = f"{dataset}-{puzzle_sizes}"
+    experiment_name = f"{dataset}-{puzzle_sizes}-{steps}-{get_random_string(6)}"
 
     tags = [f"{dataset}", f'{"franklin" if franklin else "fisso"}', "train"]
 

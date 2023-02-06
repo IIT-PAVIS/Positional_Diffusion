@@ -21,7 +21,6 @@ import wandb
 
 
 def main(batch_size, gpus, steps, num_workers):
-
     celeba_get_fn = lambda x: x[0]
 
     # celebA_tr = CelebA(
@@ -50,8 +49,9 @@ def main(batch_size, gpus, steps, num_workers):
         dataset=dt_test,
         dataset_get_fn=celeba_get_fn,
         patch_per_dim=[
-            (12, 12),
+            (8, 8),
         ],
+        train=False,
     )
 
     dl_train = torch_geometric.loader.DataLoader(
@@ -71,11 +71,11 @@ def main(batch_size, gpus, steps, num_workers):
     # save_and_sample_every=save_and_sample_every,
     ## bb="DarkNet",
     # )
-    model = GNN_Diffusion.load_from_checkpoint("epoch=269-step=193050.ckpt")
+    model = GNN_Diffusion.load_from_checkpoint("epoch=539-step=135000.ckpt")
 
     model.initialize_torchmetrics(
         [
-            (12, 12),
+            (8, 8),
         ]
     )
 

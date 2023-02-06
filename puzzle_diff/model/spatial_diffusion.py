@@ -194,7 +194,7 @@ class GNN_Diffusion(pl.LightningModule):
 
         # define beta schedule
         betas = linear_beta_schedule(timesteps=steps)
-        self.timesteps = torch.arange(0, 700).flip(0)
+        # self.timesteps = torch.arange(0, 700).flip(0)
         self.register_buffer("betas", betas)
         # self.betas = cosine_beta_schedule(timesteps=steps)
         # define alphas
@@ -222,6 +222,7 @@ class GNN_Diffusion(pl.LightningModule):
         self.register_buffer("posterior_variance", posterior_variance)
 
         self.steps = steps
+
         ### BACKBONE
         if bb == "DarkNet":
             self.model = Dark_TFConv(steps=steps)
@@ -295,7 +296,6 @@ class GNN_Diffusion(pl.LightningModule):
         # return final_feats
 
     def visual_features(self, patch_rgb):
-
         # patch_rgb = (patch_rgb - self.mean) / self.std
 
         # # fe[3].reshape(fe[0].shape[0],-1)
@@ -307,7 +307,6 @@ class GNN_Diffusion(pl.LightningModule):
 
     # forward diffusion
     def q_sample(self, x_start, t, noise=None):
-
         if noise is None:
             noise = torch.randn_like(x_start)
 
@@ -346,7 +345,6 @@ class GNN_Diffusion(pl.LightningModule):
         edge_index=None,
         batch=None,
     ):
-
         if noise is None:
             noise = torch.randn_like(x_start)
 
@@ -466,7 +464,6 @@ class GNN_Diffusion(pl.LightningModule):
         prev_sample = alpha_prod_prev ** (0.5) * x_0 + pred_sample_direction
 
         if eta > 0:
-
             noise = torch.randn(model_output.shape, dtype=model_output.dtype).to(
                 self.device
             )
@@ -481,7 +478,7 @@ class GNN_Diffusion(pl.LightningModule):
 
         b = shape[0]
         # start from pure noise (for each example in the batch)
-        img = torch.randn(shape, device=device)
+        img = torch.randn(shape, device=device) * 0
         # img = einops.rearrange(
         #     img,
         #     "b c (w1 w) (h1 h) -> b (w1 h1) c w h",
@@ -494,7 +491,7 @@ class GNN_Diffusion(pl.LightningModule):
 
         # time_t = torch.full((b,), i, device=device, dtype=torch.long)
 
-        time_t = torch.full((b,), 0, device=device, dtype=torch.long)
+        # time_t = torch.full((b,), 0, device=device, dtype=torch.long)
 
         for i in tqdm(
             list(reversed(range(0, self.steps, self.inference_ratio))),
@@ -502,8 +499,8 @@ class GNN_Diffusion(pl.LightningModule):
         ):
             img = self.p_sample(
                 img,
-                # torch.full((b,), i, device=device, dtype=torch.long),
-                time_t + i,
+                torch.full((b,), i, device=device, dtype=torch.long),
+                # time_t + i,
                 i,
                 cond=cond,
                 edge_index=edge_index,
@@ -556,7 +553,6 @@ class GNN_Diffusion(pl.LightningModule):
         return optimizer
 
     def training_step(self, batch, batch_idx):
-
         # return super().training_step(*args, **kwargs)
         batch_size = batch.batch.max().item() + 1
         t = torch.randint(0, self.steps, (batch_size,), device=self.device).long()
@@ -602,7 +598,6 @@ class GNN_Diffusion(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         with torch.no_grad():
-
             imgs = self.p_sample_loop(
                 batch.x.shape, batch.patches, batch.edge_index, batch=batch.batch
             )
@@ -629,7 +624,6 @@ class GNN_Diffusion(pl.LightningModule):
                     )
             # accuracy_dict = defaultdict(lambda: [])
             for i in range(batch.batch.max() + 1):
-
                 idx = torch.where(batch.batch == i)[0]
                 patches_rgb = batch.patches[idx]
                 gt_pos = batch.x[idx]
@@ -650,18 +644,19 @@ class GNN_Diffusion(pl.LightningModule):
                 sort_idx = torch.sort(pred_ass[:, 0])[1]
                 pred_ass = pred_ass[sort_idx]
 
-                # assignement = greedy_cost_assignment(gt_pos, pos)
+                assignement = greedy_cost_assignment(gt_pos, pos)
 
-                # self.num_images+=1
+                # self.num_images += 1
 
                 self.metrics[f"{tuple(n_patches)}_nImages"].update(1)
                 self.metrics["overall_nImages"].update(1)
-                if (gt_ass[:, 1] == pred_ass[:, 1]).all():
+                # if (gt_ass[:, 1] == pred_ass[:, 1]).all():
+
+                if (assignement[:, 0] == assignement[:, 1]).all():
                     self.metrics[f"{tuple(n_patches)}_acc"].update(1)
                     self.metrics["overall_acc"].update(1)
                     # accuracy_dict[tuple(n_patches)].append(1)
                 else:
-
                     self.metrics[f"{tuple(n_patches)}_acc"].update(0)
                     self.metrics["overall_acc"].update(0)
                     # accuracy_dict[tuple(n_patches)].append(0)
@@ -713,13 +708,11 @@ class GNN_Diffusion(pl.LightningModule):
     # return self.test_step(batch, batch_idx, *args, **kwargs)
 
     def create_image_from_patches(self, patches, pos, n_patches=(4, 4), i=0):
-
         patch_size = 32
         height = patch_size * n_patches[0]
         width = patch_size * n_patches[1]
         new_image = Image.new("RGB", (width, height))
         for p in range(patches.shape[0]):
-
             patch = patches[p, :]
             patch = Image.fromarray(
                 ((patch.permute(1, 2, 0)) * 255).cpu().numpy().astype(np.uint8)
@@ -863,10 +856,8 @@ class GNN_Diffusion(pl.LightningModule):
 
         # Iterate through the patches and their positions
         for i in tqdm(range(patches.shape[0])):
-
             new_image = Image.new("RGB", (64, 64))
             for p in range(patches.shape[2]):
-
                 patch = patches[i, :3, p]
                 patch = Image.fromarray(
                     ((patch.transpose(1, 2, 0) + 1) * 128).astype(np.uint8)

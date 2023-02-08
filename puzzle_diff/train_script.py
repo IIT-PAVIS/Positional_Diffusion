@@ -37,6 +37,8 @@ def main(
     sampling,
     inference_ratio,
     offline,
+    classifier_free_prob,
+    classifier_free_w,
 ):
     ### Define dataset
 
@@ -59,6 +61,8 @@ def main(
         steps=steps,
         sampling=sampling,
         inference_ratio=inference_ratio,
+        classifier_free_w=classifier_free_w,
+        classifier_free_prob=classifier_free_prob,
     )
     model.initialize_torchmetrics(puzzle_sizes)
 
@@ -111,6 +115,8 @@ if __name__ == "__main__":
         "-puzzle_sizes", nargs="+", default=[6], type=int, help="Input a list of values"
     )
     ap.add_argument("--offline", action="store_true", default=False)
+    ap.add_argument("--classifier_free_w", type=float, default=0.2)
+    ap.add_argument("--classifier_free_prob", type=float, default=0.0)
 
     args = ap.parse_args()
     print(args)
@@ -124,4 +130,6 @@ if __name__ == "__main__":
         sampling=args.sampling,
         inference_ratio=args.inference_ratio,
         offline=args.offline,
+        classifier_free_prob=args.classifier_free_prob,
+        classifier_free_w=args.classifier_free_w,
     )

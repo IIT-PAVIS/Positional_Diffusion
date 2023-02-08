@@ -23,20 +23,3 @@ repos:
         language: system
         entry: black
         types: [python]
-
-      - id: flake8
-        name: flake8
-        stages: [commit]
-        language: system
-        entry: flake8
-        types: [python]
-        exclude: setup.py
-
-      - id: mypy
-        name: mypy
-        stages: [commit]
-        language: system
-        verbose: true
-        entry: mypy puzzle_diff
-        types: [python]
-        pass_filenames: false

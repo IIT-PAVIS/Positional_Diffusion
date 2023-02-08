@@ -4,9 +4,9 @@ cd /work/fgiuliari/PuzzleDiffusion-GNN/singularity
 
 dataset='wikiart'
 puzzles='6'
-steps=100
-gpus=2
-cpus=1
+steps=300
+gpus=3
+cpus=6
 batch_size=16
 sampling='DDIM'
 inference_ratio=10

@@ -1,5 +1,7 @@
 import argparse
 import os
+import random
+import string
 import sys
 
 import torch_geometric
@@ -16,6 +18,13 @@ from pytorch_lightning.callbacks import ModelCheckpoint, ModelSummary
 from pytorch_lightning.loggers import WandbLogger
 
 import wandb
+
+
+def get_random_string(length):
+    # choose from all lowercase letter
+    letters = string.ascii_lowercase
+    result_str = "".join(random.choice(letters) for i in range(length))
+    return result_str  # print("Random string of length", length, "is:", result_str)
 
 
 def main(
@@ -38,14 +47,14 @@ def main(
     )
 
     # model = GNN_Diffusion.load_from_checkpoint("epoch=539-step=135000.ckpt")
-    model = GNN_Diffusion.load_from_checkpoint("epoch=659-step=165000.ckpt")
+    model = GNN_Diffusion.load_from_checkpoint("epoch=59-step=171000.ckpt")
     model.initialize_torchmetrics(puzzle_sizes)
 
     ### define training
 
     franklin = True if gpus > 1 else False
 
-    experiment_name = f"{dataset}-{puzzle_sizes}"
+    experiment_name = f"eval-{dataset}-{puzzle_sizes}-{steps}-{get_random_string(6)}"
 
     tags = [f"{dataset}", f'{"franklin" if franklin else "fisso"}', "train"]
 
@@ -71,17 +80,21 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
 
     # Add the arguments to the parser
-    ap.add_argument("-batch_size", type=int, default=32)
+    ap.add_argument("-batch_size", type=int, default=10)
     ap.add_argument("-gpus", type=int, default=1)
     ap.add_argument("-steps", type=int, default=300)
     ap.add_argument("-num_workers", type=int, default=8)
     ap.add_argument(
-        "-dataset", default="celeba", choices=["celeba", "wikiart", "cifar100"]
+        "-dataset", default="wikiart", choices=["celeba", "wikiart", "cifar100"]
     )
     ap.add_argument("-sampling", default="DDIM", choices=["DDPM", "DDIM"])
     ap.add_argument("-inference_ratio", type=int, default=10)
     ap.add_argument(
-        "-puzzle_sizes", nargs="+", default=[6], type=int, help="Input a list of values"
+        "-puzzle_sizes",
+        nargs="+",
+        default=[12],
+        type=int,
+        help="Input a list of values",
     )
     ap.add_argument("--offline", action="store_true", default=False)
 

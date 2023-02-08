@@ -167,8 +167,8 @@ class GNN_Diffusion(pl.LightningModule):
         learning_rate=1e-4,
         save_and_sample_every=1000,
         bb=None,
-        classifier_free_prob=0.1,
-        classifier_free_w=4.0,
+        classifier_free_prob=0,
+        classifier_free_w=0,
         *args,
         **kwargs,
     ) -> None:
@@ -354,17 +354,25 @@ class GNN_Diffusion(pl.LightningModule):
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
 
         patch_feats = self.visual_features(cond)
-        classifier_free_probs = (
-            torch.rand(patch_feats.shape[0])
-            .repeat_interleave(patch_feats.shape[1])
-            .reshape(patch_feats.shape)
-        ).to(patch_feats.device)
+        batch_size = batch.max() + 1
+        batch_one_hot = torch.nn.functional.one_hot(batch)
+        prob = (
+            batch_one_hot.float() @ torch.rand(batch_size, device=self.device)
+            > self.classifier_free_prob
+        )
+        classifier_free_patch_feats = prob[:, None] * patch_feats
+        # classifier_free_patch_feats=patch_feats@prob
+        # classifier_free_probs = (
+        #     torch.rand(patch_feats.shape[0])
+        #     .repeat_interleave(patch_feats.shape[1])
+        #     .reshape(patch_feats.shape)
+        # ).to(patch_feats.device)
 
-        classifier_free_patch_feats = torch.where(
-            classifier_free_probs > self.classifier_free_prob,
-            patch_feats,
-            torch.zeros_like(patch_feats),
-        )  # Standard conditioning is a special case when self.classifier_free_prob = 0.0
+        # classifier_free_patch_feats = torch.where(
+        #     classifier_free_probs > self.classifier_free_prob,
+        #     patch_feats,
+        #     torch.zeros_like(patch_feats),
+        # )  # Standard conditioning is a special case when self.classifier_free_prob = 0.0
 
         predicted_noise = self.forward_with_feats(
             x_noisy,

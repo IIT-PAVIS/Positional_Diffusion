@@ -1,8 +1,8 @@
 from torchvision.datasets import CIFAR100
-
+from .wikiart_dt import Wikiart_DT
 from .celeba_dt import CelebA_HQ
 from .puzzle_dataset import Puzzle_Dataset, Puzzle_Dataset_MP
-from .wikiart_dt import Wikiart_DT
+
 
 ALLOWED_DT = ["celeba", "cifar100", "wikiart"]
 

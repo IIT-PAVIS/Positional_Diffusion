@@ -18,4 +18,3 @@ echo $NAME
 echo ""
 echo $ARGS
 qsub -l select=1:ngpus=$gpus:ncpus=$cpus -v pyfile=puzzle_diff/train_script_missing.py,args="$ARGS" -N "$NAME"  pbs_args.sh
-

@@ -2,8 +2,8 @@ import math
 import random
 from typing import List
 
-import albumentations
-import cv2
+# import albumentations
+# import cv2
 import einops
 import numpy as np
 import torch
@@ -23,8 +23,8 @@ def divide_images_into_patches(
 
     # divide images in non-overlapping patches based on patch size
     # output dim -> a
-    # img2 = img.permute(1, 2, 0)
-    patches = img.unfold(0, patch_size, patch_size).unfold(1, patch_size, patch_size)
+    img2 = img.permute(1, 2, 0)
+    patches = img2.unfold(0, patch_size, patch_size).unfold(1, patch_size, patch_size)
     y = torch.linspace(-1, 1, patch_per_dim[0])
     x = torch.linspace(-1, 1, patch_per_dim[1])
     xy = torch.stack(torch.meshgrid(x, y, indexing="xy"), -1)
@@ -50,20 +50,17 @@ class Puzzle_Dataset(pyg_data.Dataset):
         self.patch_per_dim = patch_per_dim
         self.train = train
         if train:
-            self.transforms = transforms.Compose([transforms.ToTensor()])
-            self.Image_Aug = albumentations.Compose(
+            self.transforms = transforms.Compose(
                 [
-                    albumentations.augmentations.HorizontalFlip(p=0.5),
-                    albumentations.augmentations.ShiftScaleRotate(
-                        shift_limit=0.05,
-                        scale_limit=0.05,
-                        rotate_limit=10,
-                        interpolation=cv2.INTER_CUBIC,
-                        p=1,
+                    transforms.RandomHorizontalFlip(p=0.5),
+                    transforms.RandomAffine(
+                        degrees=(-10, 10),
+                        translate=(0.1, 0.1),
+                        scale=(0.8, 1.2),
                     ),
+                    transforms.ToTensor(),
                 ]
             )
-
         else:
             self.transforms = transforms.Compose([transforms.ToTensor()])
         self.patch_size = patch_size
@@ -84,13 +81,7 @@ class Puzzle_Dataset(pyg_data.Dataset):
         width = patch_per_dim[1] * self.patch_size
         img = img.resize((width, height))
 
-        img = np.array(img)
-        if self.train:
-            img_aug = self.Image_Aug(image=img)
-            img = img_aug["image"]
-        img = torch.tensor(img / 255).float()
-
-        # img = self.transforms(img)
+        img = self.transforms(img)
         xy, patches = divide_images_into_patches(img, patch_per_dim, self.patch_size)
 
         xy = einops.rearrange(xy, "x y c -> (x y) c")
@@ -140,12 +131,7 @@ class Puzzle_Dataset_MP(Puzzle_Dataset):
         width = patch_per_dim[1] * self.patch_size
         img = img.resize((width, height))
 
-        # img = self.transforms(img)
-        img = np.array(img)
-        if self.train:
-            img_aug = self.Image_Aug(image=img)
-            img = img_aug["image"]
-        img = torch.tensor(img / 255).float()
+        img = self.transforms(img)
         xy, patches = divide_images_into_patches(img, patch_per_dim, self.patch_size)
 
         xy = einops.rearrange(xy, "x y c -> (x y) c")

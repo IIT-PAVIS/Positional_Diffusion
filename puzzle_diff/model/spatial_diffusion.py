@@ -1,13 +1,18 @@
-from pathlib import Path
-from typing import Any
-import pytorch_lightning as pl
-import scipy
-from functools import partial
-from transformers.optimization import Adafactor
-
+import colorsys
 # from .backbones.Transformer_GNN import Transformer_GNN
 from collections import defaultdict
+from functools import partial
+from pathlib import Path
+from typing import Any
 
+import einops
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import PIL
+import pytorch_lightning as pl
+import scipy
+import timm
 # from .network_modules import (
 #     default,
 #     partial,
@@ -25,25 +30,17 @@ from collections import defaultdict
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import einops
-from tqdm import tqdm
-from torch.optim import Adam
-
-import matplotlib
-import matplotlib.pyplot as plt
-import numpy as np
-import PIL
-import wandb
-from torch import Tensor
-import torchvision
-import timm
 import torch_geometric.nn.models
-from PIL import Image
-
-import matplotlib
 import torchmetrics
+import torchvision
+import wandb
+from PIL import Image
+from torch import Tensor
+from torch.optim import Adam
+from tqdm import tqdm
+from transformers.optimization import Adafactor
+
 from .backbones import Dark_TFConv, Eff_GAT
-import colorsys
 
 matplotlib.use("agg")
 
@@ -99,7 +96,7 @@ def linear_beta_schedule(timesteps):
 def quadratic_beta_schedule(timesteps):
     beta_start = 0.0001
     beta_end = 0.02
-    return torch.linspace(beta_start**0.5, beta_end**0.5, timesteps) ** 2
+    return torch.linspace(beta_start ** 0.5, beta_end ** 0.5, timesteps) ** 2
 
 
 def sigmoid_beta_schedule(timesteps):
@@ -167,6 +164,8 @@ class GNN_Diffusion(pl.LightningModule):
         learning_rate=1e-4,
         save_and_sample_every=1000,
         bb=None,
+        classifier_free_prob=0.1,
+        classifier_free_w=4.0,
         *args,
         **kwargs,
     ) -> None:
@@ -174,7 +173,8 @@ class GNN_Diffusion(pl.LightningModule):
 
         self.learning_rate = learning_rate
         self.save_and_sample_every = save_and_sample_every
-
+        self.classifier_free_prob = classifier_free_prob
+        self.classifier_free_w = classifier_free_w
         ### DIFFUSION STUFF
 
         if sampling == "DDPM":
@@ -272,6 +272,7 @@ class GNN_Diffusion(pl.LightningModule):
         patch_feats: Tensor,
         batch,
     ) -> Any:
+
         return self.model.forward_with_feats(
             xy_pos, time, patch_rgb, edge_index, patch_feats, batch
         )
@@ -349,7 +350,30 @@ class GNN_Diffusion(pl.LightningModule):
             noise = torch.randn_like(x_start)
 
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
-        predicted_noise = self(x_noisy, t, cond, edge_index, batch)
+
+        
+
+        patch_feats = self.visual_features(cond)
+        classifier_free_probs = (
+            torch.rand(patch_feats.shape[0])
+            .repeat_interleave(patch_feats.shape[1])
+            .reshape(patch_feats.shape)
+        ).to(patch_feats.device)
+
+        classifier_free_patch_feats = torch.where(
+            classifier_free_probs > self.classifier_free_prob,
+            patch_feats,
+            torch.zeros_like(patch_feats),
+        )  # Standard conditioning is a special case when self.classifier_free_prob = 0.0
+
+        predicted_noise = self.forward_with_feats(
+            x_noisy,
+            t,
+            cond,
+            edge_index,
+            patch_feats=classifier_free_patch_feats,
+            batch=batch,
+        )
 
         if loss_type == "l1":
             loss = F.l1_loss(noise, predicted_noise)
@@ -445,19 +469,37 @@ class GNN_Diffusion(pl.LightningModule):
         beta = 1 - alpha_prod
         beta_prev = 1 - alpha_prod_prev
 
-        model_output = self.forward_with_feats(
-            x, t, cond, edge_index, patch_feats=patch_feats, batch=batch
-        )
+        if self.classifier_free_prob > 0.0:
+            model_output_cond = self.forward_with_feats(
+                x, t, cond, edge_index, patch_feats=patch_feats, batch=batch
+            )
+
+            model_output_uncond = self.forward_with_feats(
+                x,
+                t,
+                cond,
+                edge_index,
+                patch_feats=torch.zeros_like(patch_feats),
+                batch=batch,
+            )
+            model_output = (
+                1 + self.classifier_free_w
+            ) * model_output_cond - self.classifier_free_w * model_output_uncond
+        else:
+            model_output = self.forward_with_feats(
+                x, t, cond, edge_index, patch_feats=patch_feats, batch=batch
+            )
+
 
         # estimate x    _0
-        x_0 = (x - beta**0.5 * model_output) / alpha_prod**0.5
+        x_0 = (x - beta ** 0.5 * model_output) / alpha_prod ** 0.5
         variance = self._get_variance(
             t, prev_timestep
         )  # (beta_prev / beta) * (1 - alpha_prod / alpha_prod_prev)
-        std_eta = eta * variance**0.5
+        std_eta = eta * variance ** 0.5
 
         # estimate "direction to x_t"
-        pred_sample_direction = (1 - alpha_prod_prev - std_eta**2) ** (
+        pred_sample_direction = (1 - alpha_prod_prev - std_eta ** 2) ** (
             0.5
         ) * model_output
 
@@ -497,6 +539,7 @@ class GNN_Diffusion(pl.LightningModule):
             list(reversed(range(0, self.steps, self.inference_ratio))),
             desc="sampling loop time step",
         ):
+            
             img = self.p_sample(
                 img,
                 torch.full((b,), i, device=device, dtype=torch.long),
@@ -811,7 +854,7 @@ class GNN_Diffusion(pl.LightningModule):
                 k2=self.patches,
             )
             ax[0][i].imshow(img)
-            for k in range(self.patches**2):
+            for k in range(self.patches ** 2):
                 ax[2][i].plot(pos[k][0], pos[k][1], "*", label=f"p-{k}")
                 ax[2][i].set_xlim([-1, 2])
                 ax[2][i].set_ylim([-1, 2])

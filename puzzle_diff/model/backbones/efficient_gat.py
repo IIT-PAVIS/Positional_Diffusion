@@ -1,9 +1,10 @@
-import torch.nn as nn
-import torch
 import timm
-from .Transformer_GNN import Transformer_GNN
+import torch
+import torch.nn as nn
 from torch import Tensor
 from torch_geometric.nn import GraphNorm
+
+from .Transformer_GNN import Transformer_GNN
 
 
 class Eff_GAT(nn.Module):
@@ -54,7 +55,6 @@ class Eff_GAT(nn.Module):
         self.register_buffer("std", std)
 
     def forward(self, xy_pos, time, patch_rgb, edge_index, batch):
-
         # patch_rgb = (patch_rgb - self.mean) / self.std
 
         ## fe[3].reshape(fe[0].shape[0],-1)
@@ -78,7 +78,6 @@ class Eff_GAT(nn.Module):
         patch_feats: Tensor,
         batch,
     ):
-
         time_feats = self.time_emb(time)  # embedding, int -> 32
         pos_feats = self.pos_mlp(xy_pos)  # MLP, (x, y) -> 32
 
@@ -97,7 +96,6 @@ class Eff_GAT(nn.Module):
         return final_feats
 
     def visual_features(self, patch_rgb):
-
         patch_rgb = (patch_rgb - self.mean) / self.std
 
         feats = self.visual_backbone.forward(patch_rgb)

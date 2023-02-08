@@ -1,8 +1,9 @@
-import torch.nn as nn
-import torch
 import timm
-from .Transformer_GNN import Transformer_GNN
+import torch
+import torch.nn as nn
 from torch import Tensor
+
+from .Transformer_GNN import Transformer_GNN
 
 
 class Dark_TFConv(nn.Module):
@@ -52,7 +53,6 @@ class Dark_TFConv(nn.Module):
         self.register_buffer("std", std)
 
     def forward(self, xy_pos, time, patch_rgb, edge_index, batch):
-
         patch_rgb = (patch_rgb - self.mean) / self.std
 
         # fe[3].reshape(fe[0].shape[0],-1)
@@ -99,7 +99,6 @@ class Dark_TFConv(nn.Module):
         return final_feats
 
     def visual_features(self, patch_rgb):
-
         patch_rgb = (patch_rgb - self.mean) / self.std
 
         # fe[3].reshape(fe[0].shape[0],-1)

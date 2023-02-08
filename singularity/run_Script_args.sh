@@ -9,4 +9,4 @@ cd /app
 python $1 $2
 
 
-#homogenous/train_E2E_batch_4layers.py 
+#homogenous/train_E2E_batch_4layers.py

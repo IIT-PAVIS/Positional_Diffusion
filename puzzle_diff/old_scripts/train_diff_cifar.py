@@ -1,25 +1,26 @@
 import argparse
-import sys, os
+import os
+import sys
 from typing import Tuple
 
 import torch_geometric
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
 
+import argparse
+import math
+
+import pytorch_lightning as pl
 from dataset.puzzle_dataset import Puzzle_Dataset
 from model.spatial_diffusion import GNN_Diffusion
-import argparse
-from torchvision.datasets import CelebA, CIFAR100
-import pytorch_lightning as pl
-import math
 from pytorch_lightning.callbacks import ModelCheckpoint
-
 from pytorch_lightning.loggers import WandbLogger
+from torchvision.datasets import CIFAR100, CelebA
+
 import wandb
 
 
 def main(batch_size, gpus, steps):
-
     celeba_get_fn = lambda x: x[0]
 
     celebA_tr = CIFAR100(

@@ -1,7 +1,6 @@
+import tqdm
 import webdataset as wds
 from torchvision.datasets import CelebA
-import tqdm
-
 
 celebA_tr = CelebA(
     root="./datasets",

@@ -1,4 +1,5 @@
 import colorsys
+
 # from .backbones.Transformer_GNN import Transformer_GNN
 from collections import defaultdict
 from functools import partial
@@ -13,6 +14,7 @@ import PIL
 import pytorch_lightning as pl
 import scipy
 import timm
+
 # from .network_modules import (
 #     default,
 #     partial,
@@ -33,12 +35,13 @@ import torch.nn.functional as F
 import torch_geometric.nn.models
 import torchmetrics
 import torchvision
-import wandb
 from PIL import Image
 from torch import Tensor
 from torch.optim import Adam
 from tqdm import tqdm
 from transformers.optimization import Adafactor
+
+import wandb
 
 from .backbones import Dark_TFConv, Eff_GAT
 
@@ -96,7 +99,7 @@ def linear_beta_schedule(timesteps):
 def quadratic_beta_schedule(timesteps):
     beta_start = 0.0001
     beta_end = 0.02
-    return torch.linspace(beta_start ** 0.5, beta_end ** 0.5, timesteps) ** 2
+    return torch.linspace(beta_start**0.5, beta_end**0.5, timesteps) ** 2
 
 
 def sigmoid_beta_schedule(timesteps):
@@ -272,7 +275,6 @@ class GNN_Diffusion(pl.LightningModule):
         patch_feats: Tensor,
         batch,
     ) -> Any:
-
         return self.model.forward_with_feats(
             xy_pos, time, patch_rgb, edge_index, patch_feats, batch
         )
@@ -350,8 +352,6 @@ class GNN_Diffusion(pl.LightningModule):
             noise = torch.randn_like(x_start)
 
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
-
-        
 
         patch_feats = self.visual_features(cond)
         classifier_free_probs = (
@@ -490,16 +490,15 @@ class GNN_Diffusion(pl.LightningModule):
                 x, t, cond, edge_index, patch_feats=patch_feats, batch=batch
             )
 
-
         # estimate x    _0
-        x_0 = (x - beta ** 0.5 * model_output) / alpha_prod ** 0.5
+        x_0 = (x - beta**0.5 * model_output) / alpha_prod**0.5
         variance = self._get_variance(
             t, prev_timestep
         )  # (beta_prev / beta) * (1 - alpha_prod / alpha_prod_prev)
-        std_eta = eta * variance ** 0.5
+        std_eta = eta * variance**0.5
 
         # estimate "direction to x_t"
-        pred_sample_direction = (1 - alpha_prod_prev - std_eta ** 2) ** (
+        pred_sample_direction = (1 - alpha_prod_prev - std_eta**2) ** (
             0.5
         ) * model_output
 
@@ -539,7 +538,6 @@ class GNN_Diffusion(pl.LightningModule):
             list(reversed(range(0, self.steps, self.inference_ratio))),
             desc="sampling loop time step",
         ):
-            
             img = self.p_sample(
                 img,
                 torch.full((b,), i, device=device, dtype=torch.long),
@@ -854,7 +852,7 @@ class GNN_Diffusion(pl.LightningModule):
                 k2=self.patches,
             )
             ax[0][i].imshow(img)
-            for k in range(self.patches ** 2):
+            for k in range(self.patches**2):
                 ax[2][i].plot(pos[k][0], pos[k][1], "*", label=f"p-{k}")
                 ax[2][i].set_xlim([-1, 2])
                 ax[2][i].set_ylim([-1, 2])

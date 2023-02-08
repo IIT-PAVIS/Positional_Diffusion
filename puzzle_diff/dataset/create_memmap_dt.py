@@ -1,9 +1,10 @@
-import numpy as np
+import random
 from pathlib import Path
+
+import numpy as np
+import tables as tb
 from PIL import Image
 from tqdm import tqdm
-import tables as tb
-import random
 
 images = set(list(Path("datasets/wikiart").glob("*/*.jpg")))
 test_file = Path("datasets/puzzlewikiart-test-metadata.txt")

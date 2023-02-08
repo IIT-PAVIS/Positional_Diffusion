@@ -1,30 +1,31 @@
 import argparse
-import sys, os
+import os
+import sys
 from typing import Tuple
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
 
-import pytorch_lightning as pl
-from torchvision import transforms
-from torch.utils.data import DataLoader
-from torchvision.transforms import (
-    Compose,
-    ToTensor,
-    Lambda,
-    ToPILImage,
-    CenterCrop,
-    Resize,
-)
+import math
 
-from torchvision.datasets import CelebA, Flickr8k, CIFAR100
+import einops
+import pytorch_lightning as pl
 import torch
 from lightning_modules.Diffusion_network_2 import DiffusionModel_Cond
 from pytorch_lightning.callbacks import ModelCheckpoint
-
 from pytorch_lightning.loggers import WandbLogger
-import einops
+from torch.utils.data import DataLoader
+from torchvision import transforms
+from torchvision.datasets import CIFAR100, CelebA, Flickr8k
+from torchvision.transforms import (
+    CenterCrop,
+    Compose,
+    Lambda,
+    Resize,
+    ToPILImage,
+    ToTensor,
+)
+
 import wandb
-import math
 
 
 def main(batch_size, gpus, steps):
@@ -114,7 +115,9 @@ def main(batch_size, gpus, steps):
     # dataset_tr = CelebA(
     #     root="./dataset", download=True, split="train", transform=transform_tr
     # )
-    dataset_tr = CIFAR100(root=".dataset", train=True, transform=transform_tr,download=True)
+    dataset_tr = CIFAR100(
+        root=".dataset", train=True, transform=transform_tr, download=True
+    )
     dataloader_tr = DataLoader(
         dataset_tr, batch_size=batch_size, shuffle=True, num_workers=8
     )
@@ -123,7 +126,9 @@ def main(batch_size, gpus, steps):
     #     root="./dataset", download=True, split="test", transform=transform_val
     # )
 
-    dataset_val = CIFAR100(root=".dataset", train=False, transform=transform_val,download=True)
+    dataset_val = CIFAR100(
+        root=".dataset", train=False, transform=transform_val, download=True
+    )
     dataloader_val = DataLoader(dataset_val, batch_size=4, shuffle=False, num_workers=8)
 
     model = DiffusionModel_Cond(

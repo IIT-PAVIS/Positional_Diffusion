@@ -1,22 +1,24 @@
 import argparse
+import os
+import sys
 from functools import partial
-import sys, os
 from typing import Tuple
 
 import torch_geometric
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
 
+import argparse
+import math
+
+import pytorch_lightning as pl
 from dataset.puzzle_dataset import Puzzle_Dataset
 from dataset.wikiart_dt import Wikiart_DT  # , Wikiart_DT_pytables
 from model.spatial_diffusion import GNN_Diffusion
-import argparse
-from torchvision.datasets import CelebA
-import pytorch_lightning as pl
-import math
 from pytorch_lightning.callbacks import ModelCheckpoint, ModelSummary
-
 from pytorch_lightning.loggers import WandbLogger
+from torchvision.datasets import CelebA
+
 import wandb
 
 

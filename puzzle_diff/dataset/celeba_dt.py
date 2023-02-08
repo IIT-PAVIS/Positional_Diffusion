@@ -1,6 +1,7 @@
-from torch.utils.data import Dataset
 from pathlib import Path
+
 from PIL import Image, ImageFile
+from torch.utils.data import Dataset
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 

@@ -1,6 +1,6 @@
 
 #!/bin/bash
-cd /work/fgiuliari/PuzzleDiffusion-GNN/singularity
+cd /work/fgiuliari/PuzzleDiffusion-GNN/singularity/francesco
 
 dataset='celeba'
 puzzles='6'

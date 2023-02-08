@@ -164,8 +164,8 @@ class GNN_Diffusion(pl.LightningModule):
         learning_rate=1e-4,
         save_and_sample_every=1000,
         bb=None,
-        classifier_free_prob=0.0,
-        classifier_free_w=0.2,
+        classifier_free_prob=0.1,
+        classifier_free_w=4.0,
         *args,
         **kwargs,
     ) -> None:
@@ -351,14 +351,14 @@ class GNN_Diffusion(pl.LightningModule):
 
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
 
-        # TODO (gianscarpe) add classifier-free guidance (with/without cond)
+        
 
         patch_feats = self.visual_features(cond)
         classifier_free_probs = (
             torch.rand(patch_feats.shape[0])
             .repeat_interleave(patch_feats.shape[1])
             .reshape(patch_feats.shape)
-        )
+        ).to(patch_feats.device)
 
         classifier_free_patch_feats = torch.where(
             classifier_free_probs > self.classifier_free_prob,
@@ -484,7 +484,12 @@ class GNN_Diffusion(pl.LightningModule):
             )
             model_output = (
                 1 + self.classifier_free_w
-            ) * model_output_cond - self.clasifier_free_w * model_output_uncond
+            ) * model_output_cond - self.classifier_free_w * model_output_uncond
+        else:
+            model_output = self.forward_with_feats(
+                x, t, cond, edge_index, patch_feats=patch_feats, batch=batch
+            )
+
 
         # estimate x    _0
         x_0 = (x - beta ** 0.5 * model_output) / alpha_prod ** 0.5
@@ -534,7 +539,7 @@ class GNN_Diffusion(pl.LightningModule):
             list(reversed(range(0, self.steps, self.inference_ratio))),
             desc="sampling loop time step",
         ):
-            # TODO (gianscarpe): add classifier-free guidance (inference)
+            
             img = self.p_sample(
                 img,
                 torch.full((b,), i, device=device, dtype=torch.long),

@@ -169,6 +169,7 @@ class GNN_Diffusion(pl.LightningModule):
         bb=None,
         classifier_free_prob=0,
         classifier_free_w=0,
+        noise_weight=1.0,
         *args,
         **kwargs,
     ) -> None:
@@ -178,6 +179,7 @@ class GNN_Diffusion(pl.LightningModule):
         self.save_and_sample_every = save_and_sample_every
         self.classifier_free_prob = classifier_free_prob
         self.classifier_free_w = classifier_free_w
+        self.noise_weight = noise_weight
         ### DIFFUSION STUFF
 
         if sampling == "DDPM":
@@ -527,7 +529,7 @@ class GNN_Diffusion(pl.LightningModule):
 
         b = shape[0]
         # start from pure noise (for each example in the batch)
-        img = torch.randn(shape, device=device)
+        img = torch.randn(shape, device=device) * self.noise_weight
         # img = einops.rearrange(
         #     img,
         #     "b c (w1 w) (h1 h) -> b (w1 h1) c w h",

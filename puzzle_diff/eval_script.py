@@ -37,6 +37,8 @@ def main(
     sampling,
     inference_ratio,
     offline,
+    noise_weight,
+    checkpoint_path,
 ):
     ### Define dataset
 
@@ -47,7 +49,8 @@ def main(
     )
 
     # model = GNN_Diffusion.load_from_checkpoint("epoch=539-step=135000.ckpt")
-    model = GNN_Diffusion.load_from_checkpoint("epoch=59-step=171000.ckpt")
+    model = GNN_Diffusion.load_from_checkpoint(checkpoint_path)
+    model.noise_weight = noise_weight
     model.initialize_torchmetrics(puzzle_sizes)
 
     ### define training
@@ -97,6 +100,8 @@ if __name__ == "__main__":
         help="Input a list of values",
     )
     ap.add_argument("--offline", action="store_true", default=False)
+    ap.add_argument("--noise_weight", type=float, default=1.0)
+    ap.add_argument("--checkpoint_path", type=str, default="")
 
     args = ap.parse_args()
     print(args)
@@ -110,4 +115,6 @@ if __name__ == "__main__":
         sampling=args.sampling,
         inference_ratio=args.inference_ratio,
         offline=args.offline,
+        noise_weight=args.noise_weight,
+        checkpoint_path=args.checkpoint_path,
     )

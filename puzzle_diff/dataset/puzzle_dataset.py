@@ -40,7 +40,7 @@ class Puzzle_Dataset(pyg_data.Dataset):
         dataset_get_fn=None,
         patch_per_dim=[(7, 6)],
         patch_size=32,
-        train=False,
+        augment=False,
     ) -> None:
         super().__init__()
 
@@ -48,8 +48,8 @@ class Puzzle_Dataset(pyg_data.Dataset):
         self.dataset = dataset
         self.dataset_get_fn = dataset_get_fn
         self.patch_per_dim = patch_per_dim
-        self.train = train
-        if train:
+        self.augment = augment
+        if augment:
             self.transforms = transforms.Compose(
                 [
                     transforms.RandomHorizontalFlip(p=0.5),
@@ -109,14 +109,14 @@ class Puzzle_Dataset_MP(Puzzle_Dataset):
         patch_per_dim=[(7, 6)],
         patch_size=32,
         missing_perc=10,
-        train=False,
+        augment=False,
     ) -> None:
         super().__init__(
             dataset=dataset,
             dataset_get_fn=dataset_get_fn,
             patch_per_dim=patch_per_dim,
             patch_size=patch_size,
-            train=train,
+            augment=augment,
         )
         self.missing_pieces_perc = missing_perc
 

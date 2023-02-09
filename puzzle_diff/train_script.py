@@ -39,6 +39,7 @@ def main(
     offline,
     classifier_free_prob,
     classifier_free_w,
+    noise_weight,
 ):
     ### Define dataset
 
@@ -63,6 +64,7 @@ def main(
         inference_ratio=inference_ratio,
         classifier_free_w=classifier_free_w,
         classifier_free_prob=classifier_free_prob,
+        noise_weight=noise_weight,
     )
     model.initialize_torchmetrics(puzzle_sizes)
 
@@ -79,7 +81,8 @@ def main(
         settings=wandb.Settings(code_dir="."),
         offline=offline,
         name=experiment_name,
-        entity="puzzle_diff",
+        # entity="puzzle_diff",
+        entity="puzzle_diff_academic",
         tags=tags,
     )
 
@@ -117,6 +120,7 @@ if __name__ == "__main__":
     ap.add_argument("--offline", action="store_true", default=False)
     ap.add_argument("--classifier_free_w", type=float, default=0.2)
     ap.add_argument("--classifier_free_prob", type=float, default=0.0)
+    ap.add_argument("--noise_weight", type=float, default=1.0)
 
     args = ap.parse_args()
     print(args)
@@ -132,4 +136,5 @@ if __name__ == "__main__":
         offline=args.offline,
         classifier_free_prob=args.classifier_free_prob,
         classifier_free_w=args.classifier_free_w,
+        noise_weight=args.noise_weight,
     )

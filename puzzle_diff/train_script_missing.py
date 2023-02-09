@@ -78,6 +78,7 @@ def main(
         settings=wandb.Settings(code_dir="."),
         offline=offline,
         name=experiment_name,
+        entity="puzzle_diff_academic",
         tags=tags,
     )
 

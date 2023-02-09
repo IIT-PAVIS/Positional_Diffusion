@@ -7,7 +7,7 @@ from .wikiart_dt import Wikiart_DT
 ALLOWED_DT = ["celeba", "cifar100", "wikiart"]
 
 
-def get_dataset(dataset: str, puzzle_sizes: list) -> tuple:
+def get_dataset(dataset: str, puzzle_sizes: list, augment=False) -> tuple:
     """
     Get dataset of images based on specified dataset name and puzzle sizes.
 
@@ -49,19 +49,20 @@ def get_dataset(dataset: str, puzzle_sizes: list) -> tuple:
         dataset=train_dt,
         dataset_get_fn=get_fn,
         patch_per_dim=real_puzzle_sizes,
-        train=True,
+        augment=augment,
     )
     puzzleDt_test = Puzzle_Dataset(
         dataset=test_dt,
         dataset_get_fn=get_fn,
         patch_per_dim=real_puzzle_sizes,
+        augment=False,
     )
 
     return (puzzleDt_train, puzzleDt_test, real_puzzle_sizes)
 
 
 def get_dataset_missing_pieces(
-    dataset: str, puzzle_sizes: list, missing_pieces_perc: int
+    dataset: str, puzzle_sizes: list, missing_pieces_perc: int, augment: bool = False
 ) -> tuple:
     """
     Get dataset of images based on specified dataset name and puzzle sizes.
@@ -105,13 +106,14 @@ def get_dataset_missing_pieces(
         dataset_get_fn=get_fn,
         patch_per_dim=real_puzzle_sizes,
         missing_perc=missing_pieces_perc,
-        train=True,
+        augment=augment,
     )
     puzzleDt_test = Puzzle_Dataset_MP(
         dataset=test_dt,
         dataset_get_fn=get_fn,
         patch_per_dim=real_puzzle_sizes,
         missing_perc=missing_pieces_perc,
+        augment=False,
     )
 
     return (puzzleDt_train, puzzleDt_test, real_puzzle_sizes)

@@ -40,11 +40,12 @@ def main(
     classifier_free_prob,
     classifier_free_w,
     noise_weight,
+    data_augmentation,
 ):
     ### Define dataset
 
     train_dt, test_dt, puzzle_sizes = get_dataset(
-        dataset=dataset, puzzle_sizes=puzzle_sizes
+        dataset=dataset, puzzle_sizes=puzzle_sizes, augment=data_augmentation
     )
 
     dl_train = torch_geometric.loader.DataLoader(
@@ -121,6 +122,7 @@ if __name__ == "__main__":
     ap.add_argument("--classifier_free_w", type=float, default=0.2)
     ap.add_argument("--classifier_free_prob", type=float, default=0.0)
     ap.add_argument("--noise_weight", type=float, default=1.0)
+    ap.add_argument("--data_augmentation", type=bool, default=False)
 
     args = ap.parse_args()
     print(args)
@@ -137,4 +139,5 @@ if __name__ == "__main__":
         classifier_free_prob=args.classifier_free_prob,
         classifier_free_w=args.classifier_free_w,
         noise_weight=args.noise_weight,
+        data_augmentation=args.data_augmentation,
     )

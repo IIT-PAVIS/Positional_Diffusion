@@ -12,7 +12,7 @@ import random
 import string
 
 import pytorch_lightning as pl
-from dataset.dataset_utils import get_dataset, get_dataset_ROT
+from dataset.dataset_utils import get_dataset_ROT
 from model.spatial_diffusion import GNN_Diffusion
 from pytorch_lightning.callbacks import ModelCheckpoint, ModelSummary
 from pytorch_lightning.loggers import WandbLogger
@@ -41,19 +41,12 @@ def main(
     classifier_free_w,
     noise_weight,
     data_augmentation,
-    checkpoint_path,
-    rotation,
 ):
     ### Define dataset
 
-    if rotation:
-        train_dt, test_dt, puzzle_sizes = get_dataset_ROT(
-            dataset=dataset, puzzle_sizes=puzzle_sizes, augment=data_augmentation
-        )
-    else:
-        train_dt, test_dt, puzzle_sizes = get_dataset(
-            dataset=dataset, puzzle_sizes=puzzle_sizes, augment=data_augmentation
-        )
+    train_dt, test_dt, puzzle_sizes = get_dataset_ROT(
+        dataset=dataset, puzzle_sizes=puzzle_sizes, augment=data_augmentation
+    )
 
     dl_train = torch_geometric.loader.DataLoader(
         train_dt, batch_size=batch_size, num_workers=num_workers, shuffle=False
@@ -73,7 +66,7 @@ def main(
         classifier_free_w=classifier_free_w,
         classifier_free_prob=classifier_free_prob,
         noise_weight=noise_weight,
-        rotation=rotation,
+        rotation=True,
     )
     model.initialize_torchmetrics(puzzle_sizes)
 
@@ -81,17 +74,14 @@ def main(
 
     franklin = True if gpus > 1 else False
 
-    experiment_name = f"{dataset}-{puzzle_sizes}-{steps}-{get_random_string(6)}"
-
-    if rotation:
-        experiment_name = "ROT-" + experiment_name
+    experiment_name = f"rot-{dataset}-{puzzle_sizes}-{steps}-{get_random_string(6)}"
 
     tags = [f"{dataset}", f'{"franklin" if franklin else "fisso"}', "train"]
 
     wandb_logger = WandbLogger(
         project="Puzzle-Diff",
         settings=wandb.Settings(code_dir="."),
-        offline=offline,
+        offline=False,
         name=experiment_name,
         # entity="puzzle_diff",
         entity="puzzle_diff_academic",
@@ -110,20 +100,19 @@ def main(
         logger=wandb_logger,
         callbacks=[checkpoint_callback, ModelSummary(max_depth=2)],
     )
-
-    trainer.fit(model, dl_train, dl_test, ckpt_path=checkpoint_path)
+    trainer.fit(model, dl_train, dl_test)
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
 
     # Add the arguments to the parser
-    ap.add_argument("-batch_size", type=int, default=6)
+    ap.add_argument("-batch_size", type=int, default=16)
     ap.add_argument("-gpus", type=int, default=1)
     ap.add_argument("-steps", type=int, default=300)
     ap.add_argument("-num_workers", type=int, default=8)
     ap.add_argument(
-        "-dataset", default="wikiart", choices=["celeba", "wikiart", "cifar100"]
+        "-dataset", default="celeba", choices=["celeba", "wikiart", "cifar100"]
     )
     ap.add_argument("-sampling", default="DDIM", choices=["DDPM", "DDIM"])
     ap.add_argument("-inference_ratio", type=int, default=10)
@@ -133,10 +122,8 @@ if __name__ == "__main__":
     ap.add_argument("--offline", action="store_true", default=False)
     ap.add_argument("--classifier_free_w", type=float, default=0.2)
     ap.add_argument("--classifier_free_prob", type=float, default=0.0)
-    ap.add_argument("--data_augmentation", type=str, default="none")
-    ap.add_argument("--checkpoint_path", type=str, default="")
     ap.add_argument("--noise_weight", type=float, default=0.0)
-    ap.add_argument("--rotation", type=bool, default=False)
+    ap.add_argument("--data_augmentation", type=bool, default=False)
 
     args = ap.parse_args()
     print(args)
@@ -154,6 +141,4 @@ if __name__ == "__main__":
         classifier_free_w=args.classifier_free_w,
         noise_weight=args.noise_weight,
         data_augmentation=args.data_augmentation,
-        checkpoint_path=args.checkpoint_path,
-        rotation=args.rotation,
     )

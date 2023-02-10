@@ -1,4 +1,5 @@
 import colorsys
+import math
 
 # from .backbones.Transformer_GNN import Transformer_GNN
 from collections import defaultdict
@@ -169,7 +170,8 @@ class GNN_Diffusion(pl.LightningModule):
         bb=None,
         classifier_free_prob=0,
         classifier_free_w=0,
-        noise_weight=1.0,
+        noise_weight=0.0,
+        rotation=False,
         *args,
         **kwargs,
     ) -> None:
@@ -180,6 +182,7 @@ class GNN_Diffusion(pl.LightningModule):
         self.classifier_free_prob = classifier_free_prob
         self.classifier_free_w = classifier_free_w
         self.noise_weight = noise_weight
+        self.rotation = rotation
         ### DIFFUSION STUFF
 
         if sampling == "DDPM":
@@ -229,10 +232,9 @@ class GNN_Diffusion(pl.LightningModule):
         self.steps = steps
 
         ### BACKBONE
-        if bb == "DarkNet":
-            self.model = Dark_TFConv(steps=steps)
-        else:
-            self.model = Eff_GAT(steps=steps)
+        self.model = Eff_GAT(steps=steps, input_channels=2, output_channels=2)
+        if self.rotation:
+            self.model = Eff_GAT(steps=steps, input_channels=4, output_channels=4)
 
         self.save_hyperparameters()
 
@@ -634,14 +636,30 @@ class GNN_Diffusion(pl.LightningModule):
                 pos = img[idx]
                 n_patches = batch.patches_dim[i]
                 i_name = batch.ind_name[i]
-                self.save_image(
-                    patches_rgb=patches_rgb,
-                    pos=pos,
-                    gt_pos=gt_pos,
-                    patches_dim=n_patches,
-                    ind_name=i_name,
-                    file_name=save_path,
-                )
+                if self.rotation:
+                    gt_pos = batch.x[idx, :2]
+                    pos = img[idx, :2]
+                    pred_rot = img[idx, 2:]
+                    gt_rot = batch.x[idx, 2:]
+                    self.save_image_rotated(
+                        patches_rgb=patches_rgb,
+                        pos=pos,
+                        gt_pos=gt_pos,
+                        patches_dim=n_patches,
+                        ind_name=i_name,
+                        file_name=save_path,
+                        gt_rotations=gt_rot,
+                        pred_rotations=pred_rot,
+                    )
+                else:
+                    self.save_image(
+                        patches_rgb=patches_rgb,
+                        pos=pos,
+                        gt_pos=gt_pos,
+                        patches_dim=n_patches,
+                        ind_name=i_name,
+                        file_name=save_path,
+                    )
 
         self.log("loss", loss)
 
@@ -654,31 +672,11 @@ class GNN_Diffusion(pl.LightningModule):
             )
             img = imgs[-1]
 
-            if self.local_rank == 0 and batch_idx < 10:
-                save_path = Path(f"results/{self.logger.experiment.name}/val")
-                for i in range(
-                    min(batch.batch.max().item(), 4)
-                ):  # save max 4 images during training loop
-                    idx = torch.where(batch.batch == i)[0]
-                    patches_rgb = batch.patches[idx]
-                    gt_pos = batch.x[idx]
-                    pos = img[idx]
-                    n_patches = batch.patches_dim[i]
-                    i_name = batch.ind_name[i]
-                    self.save_image(
-                        patches_rgb=patches_rgb,
-                        pos=pos,
-                        gt_pos=gt_pos,
-                        patches_dim=n_patches,
-                        ind_name=i_name,
-                        file_name=save_path,
-                    )
-            # accuracy_dict = defaultdict(lambda: [])
             for i in range(batch.batch.max() + 1):
                 idx = torch.where(batch.batch == i)[0]
                 patches_rgb = batch.patches[idx]
-                gt_pos = batch.x[idx]
-                pos = img[idx]
+                gt_pos = batch.x[idx, :2]
+                pos = img[idx, :2]
                 n_patches = batch.patches_dim[i].tolist()
                 i_name = batch.ind_name[i]
 
@@ -695,13 +693,53 @@ class GNN_Diffusion(pl.LightningModule):
                 sort_idx = torch.sort(pred_ass[:, 0])[1]
                 pred_ass = pred_ass[sort_idx]
 
+                correct = (gt_ass[:, 1] == pred_ass[:, 1]).all()
+                if self.rotation:
+                    pred_rot = img[idx, 2:]
+                    gt_rot = batch.x[idx, 2:]
+                    rot_correct = (
+                        torch.cosine_similarity(pred_rot, gt_rot)
+                        > math.cos(math.pi / 4)
+                    ).all()
+                    correct = correct and rot_correct
+
                 # assignement = greedy_cost_assignment(gt_pos, pos)
 
                 # self.num_images += 1
 
+                if (
+                    self.local_rank == 0
+                    and batch_idx < 10
+                    and i < min(batch.batch.max().item(), 4)
+                ):
+                    save_path = Path(f"results/{self.logger.experiment.name}/val")
+
+                    if self.rotation:
+                        self.save_image_rotated(
+                            patches_rgb=patches_rgb,
+                            pos=pos,
+                            gt_pos=gt_pos,
+                            patches_dim=n_patches,
+                            ind_name=i_name,
+                            file_name=save_path,
+                            correct=correct,
+                            gt_rotations=gt_rot,
+                            pred_rotations=pred_rot,
+                        )
+                    else:
+                        self.save_image(
+                            patches_rgb=patches_rgb,
+                            pos=pos,
+                            gt_pos=gt_pos,
+                            patches_dim=n_patches,
+                            ind_name=i_name,
+                            file_name=save_path,
+                            correct=correct,
+                        )
+
                 self.metrics[f"{tuple(n_patches)}_nImages"].update(1)
                 self.metrics["overall_nImages"].update(1)
-                if (gt_ass[:, 1] == pred_ass[:, 1]).all():
+                if correct:
                     # if (assignement[:, 0] == assignement[:, 1]).all():
                     self.metrics[f"{tuple(n_patches)}_acc"].update(1)
                     self.metrics["overall_acc"].update(1)
@@ -757,7 +795,9 @@ class GNN_Diffusion(pl.LightningModule):
     # def validation_step(self, batch, batch_idx, *args, **kwargs):
     # return self.test_step(batch, batch_idx, *args, **kwargs)
 
-    def create_image_from_patches(self, patches, pos, n_patches=(4, 4), i=0):
+    def create_image_from_patches(
+        self, patches, pos, n_patches=(4, 4), i=0, rotations=None
+    ):
         patch_size = 32
         height = patch_size * n_patches[0]
         width = patch_size * n_patches[1]
@@ -767,6 +807,11 @@ class GNN_Diffusion(pl.LightningModule):
             patch = Image.fromarray(
                 ((patch.permute(1, 2, 0)) * 255).cpu().numpy().astype(np.uint8)
             )
+            if rotations is not None:
+                deg_angle = (
+                    torch.arctan2(rotations[p, 1], rotations[p, 0]) / torch.pi * 180
+                )
+                patch = patch.rotate(-deg_angle)
             x = pos[p, 0] * (1 - 1 / n_patches[0])
             y = pos[p, 1] * (1 - 1 / n_patches[1])
             x_pos = int((x + 1) * width / 2) - patch_size // 2
@@ -775,7 +820,14 @@ class GNN_Diffusion(pl.LightningModule):
         return new_image
 
     def save_image(
-        self, patches_rgb, pos, gt_pos, patches_dim, ind_name, file_name: Path
+        self,
+        patches_rgb,
+        pos,
+        gt_pos,
+        patches_dim,
+        ind_name,
+        file_name: Path,
+        correct=None,
     ):
         file_name.mkdir(parents=True, exist_ok=True)
 
@@ -800,7 +852,7 @@ class GNN_Diffusion(pl.LightningModule):
 
         ax[1, 1].invert_yaxis()
         ax[1, 1].set_aspect("equal")
-        ax[0, 0].set_title(f"{self.current_epoch}-{ind_name}")
+        ax[0, 0].set_title(f"{self.current_epoch}-{ind_name}- correct:{correct}")
 
         ax[0, 1].set_title(f"{patches_dim}")
 
@@ -816,132 +868,96 @@ class GNN_Diffusion(pl.LightningModule):
         plt.savefig(f"{file_name}/asd_{self.current_epoch}-{ind_name}.png")
         plt.close()
 
-    def save_img(self, img_list, file_str, logger, step):
-        Path(file_str).parent.mkdir(exist_ok=True)
-        xx = einops.repeat(
-            torch.linspace(-1, 1, self.patches), "b -> b k1", k1=self.patch_size
+    def save_image_rotated(
+        self,
+        patches_rgb,
+        pos,
+        gt_pos,
+        patches_dim,
+        ind_name,
+        file_name: Path,
+        gt_rotations,
+        pred_rotations,
+        correct=None,
+    ):
+        file_name.mkdir(parents=True, exist_ok=True)
+
+        fig, ax = plt.subplots(2, 3)
+
+        gt_img_correct = self.create_image_from_patches(
+            patches_rgb,
+            gt_pos,
+            n_patches=patches_dim,
+            i=ind_name,
+            rotations=gt_rotations,
         )
-        y, x = torch.meshgrid(xx.flatten(), xx.flatten())
-        y = torch.flip(y, (0,))
-        pos_emb = torch.stack((x, y), 0)
-        pos_patches = einops.rearrange(
-            pos_emb,
-            "c (k1 w) (k2 h) -> (k1 k2) w h c",
-            k1=self.patches,
-            k2=self.patches,
-        ).mean((1, 2))
-        pos_patches = (pos_patches + 1) * 0.5
 
-        import scipy
+        gt_img = self.create_image_from_patches(
+            patches_rgb,
+            gt_pos,
+            n_patches=patches_dim,
+            i=ind_name,
+        )
 
-        matplotlib.use("agg")
-        fig, ax = plt.subplots(3, 4)
-        for i in range(img_list.shape[0]):
-            img = einops.rearrange(img_list[i][:3], "c w h -> w h c")
-            pos = einops.rearrange(
-                img_list[i][-2:],
-                "c (k1 w) (k2 h) -> (k1 k2) w h c",
-                k1=self.patches,
-                k2=self.patches,
-            )
-            pos = pos.mean((1, 2))
+        gt_img = self.create_image_from_patches(
+            patches_rgb,
+            gt_pos,
+            n_patches=patches_dim,
+            i=ind_name,
+        )
+        # assignement = greedy_cost_assignment(pos, gt_pos)
 
-            cost = scipy.spatial.distance.cdist(pos_patches, pos, "euclidean")
+        pred_img = self.create_image_from_patches(
+            patches_rgb,
+            pos,
+            n_patches=patches_dim,
+            i=ind_name,
+            rotations=pred_rotations,
+        )
+        col = list(map(interpolate_color, gt_pos))
 
-            idx = scipy.optimize.linear_sum_assignment(cost)[1]
-            img_patches = einops.rearrange(
-                img,
-                "(k1 w) (k2 h) c -> (k1 k2) w h c",
-                k1=self.patches,
-                k2=self.patches,
-            )
-            new_img = einops.rearrange(
-                img_patches[idx],
-                "(k1 k2) w h c -> (k1 w) (k2 h) c",
-                k1=self.patches,
-                k2=self.patches,
-            )
-            ax[0][i].imshow(img)
-            for k in range(self.patches**2):
-                ax[2][i].plot(pos[k][0], pos[k][1], "*", label=f"p-{k}")
-                ax[2][i].set_xlim([-1, 2])
-                ax[2][i].set_ylim([-1, 2])
-                ax[2][i].set_aspect("equal")
-            ax[1][i].imshow(new_img)
+        ax[0, 0].imshow(gt_img_correct)
+        ax[0, 1].imshow(gt_img)
+        ax[0, 2].imshow(pred_img)
 
-        ax[2][-1].legend(bbox_to_anchor=(1, -0.18), loc="upper right", ncol=4)
-        fig.subplots_adjust(bottom=0.3)
+        ax[1, 1].quiver(
+            gt_pos[:, 0].cpu(),
+            gt_pos[:, 1].cpu(),
+            gt_rotations[:, 0].cpu(),
+            gt_rotations[:, 1].cpu(),
+            color=col,
+            pivot="middle",
+            scale=10,
+            width=0.01,
+        )
+        ax[1, 1].invert_yaxis()
+        ax[1, 1].set_aspect("equal")
 
-        fig.tight_layout()
+        ax[1, 2].quiver(
+            pos[:, 0].cpu(),
+            pos[:, 1].cpu(),
+            pred_rotations[:, 0].cpu(),
+            pred_rotations[:, 1].cpu(),
+            color=col,
+            pivot="middle",
+            scale=10,
+            width=0.01,
+        )
+
+        ax[1, 2].invert_yaxis()
+        ax[1, 2].set_aspect("equal")
+        ax[0, 0].set_title(f"{self.current_epoch}-{ind_name}- correct:{correct}")
+
+        ax[0, 1].set_title(f"{patches_dim}")
+
         fig.canvas.draw()
         im = PIL.Image.frombytes(
             "RGB", fig.canvas.get_width_height(), fig.canvas.tostring_rgb()
         )
         im = wandb.Image(im)
-        logger.log({"image": im, "global_step": step})
-        plt.savefig(f"{file_str}")
-        plt.close()
-
-    def generate_video(self, predicted_img_list):
-        img1 = [im[0] for im in predicted_img_list]
-        img1_stack = np.stack(img1, 0)
-        img1_stack_pos = img1_stack[:, :, :, :]
-        patches = einops.rearrange(
-            img1_stack_pos,
-            "im pos (k1 w) (k2 h) -> im pos (k1 k2) w h",
-            k1=self.patches,
-            k2=self.patches,
+        self.logger.experiment.log(
+            {f"{file_name.stem}": im, "global_step": self.global_step}
         )
-        pos_patches = patches[:, -2:, :, :]
-        pos_mean = pos_patches.mean((-2, -1))
 
-        matplotlib.use("agg")
-
-        # Create a blank image with desired size
-        height = 64
-        width = 64
-        from PIL import Image
-
-        patch_width = patch_height = 16
-
-        # Iterate through the patches and their positions
-        for i in tqdm(range(patches.shape[0])):
-            new_image = Image.new("RGB", (64, 64))
-            for p in range(patches.shape[2]):
-                patch = patches[i, :3, p]
-                patch = Image.fromarray(
-                    ((patch.transpose(1, 2, 0) + 1) * 128).astype(np.uint8)
-                )
-                x = pos_mean[i, -2, p] * (1 - 1 / self.patches)
-                y = -pos_mean[i, -1, p] * (1 - 1 / self.patches)
-                x_pos = int((x + 1) * width / 2) - patch_width // 2
-                y_pos = int((y + 1) * height / 2) - patch_height // 2
-                new_image.paste(patch, (x_pos, y_pos))
-            new_image.save(f"video/patches_{i:04d}.png")
-
-        for i in tqdm(range(pos_mean.shape[0])):
-            plt.figure()
-            for j in range(pos_mean.shape[2]):
-                plt.scatter(pos_mean[i, 0, j], pos_mean[i, 1, j])
-            plt.xlim(-1.5, 1.5)
-            plt.ylim(-1.5, 1.5)
-            plt.savefig(f"video/{i:04d}.png")
-            plt.close()
-
-
-def img_to_patches(t, patches_per_dim):
-    return einops.rearrange(
-        t,
-        "b c (p1 w) (p2 h) -> b (p1 p2) c w h",
-        p1=patches_per_dim,
-        p2=patches_per_dim,
-    )
-
-
-def patches_to_img(t: Tensor, patches_per_dim):
-    return einops.rearrange(
-        t,
-        "b (p1 p2) c w h-> b c (p1 w) (p2 h) ",
-        p1=patches_per_dim,
-        p2=patches_per_dim,
-    )
+        plt.savefig(f"{file_name}/asd_{self.current_epoch}-{ind_name}.png")
+        plt.close()

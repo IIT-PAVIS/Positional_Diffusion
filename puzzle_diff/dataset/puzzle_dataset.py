@@ -1,6 +1,6 @@
 import math
 import random
-from typing import List
+from typing import List, Tuple
 
 # import albumentations
 # import cv2
@@ -13,6 +13,28 @@ import torch_geometric.loader
 import torchvision.transforms as transforms
 from PIL import Image
 from torch import Tensor
+from torchvision.transforms import functional as F
+
+
+class RandomCropAndResizedToOriginal(transforms.RandomResizedCrop):
+    def forward(self, img):
+        size = img.size
+        i, j, h, w = self.get_params(img, self.scale, self.ratio)
+        return F.resized_crop(img, i, j, h, w, size, self.interpolation)
+
+
+def _get_augmentation(augmentation_type: str = "none"):
+    switch = {
+        "weak": [transforms.RandomHorizontalFlip(p=0.5)],
+        "hard": [
+            transforms.RandomHorizontalFlip(p=0.5),
+            RandomCropAndResizedToOriginal(
+                size=(1, 1),
+                scale=(0.8, 1),
+            ),
+        ],
+    }
+    return switch.get(augmentation_type, [])
 
 
 @torch.jit.script
@@ -40,7 +62,7 @@ class Puzzle_Dataset(pyg_data.Dataset):
         dataset_get_fn=None,
         patch_per_dim=[(7, 6)],
         patch_size=32,
-        augment=False,
+        augment="",
     ) -> None:
         super().__init__()
 
@@ -49,26 +71,22 @@ class Puzzle_Dataset(pyg_data.Dataset):
         self.dataset_get_fn = dataset_get_fn
         self.patch_per_dim = patch_per_dim
         self.augment = augment
-        if augment:
-            self.transforms = transforms.Compose(
-                [
-                    transforms.RandomHorizontalFlip(p=0.5),
-                    # transforms.RandomAffine(
-                    #     degrees=(-10, 10),
-                    #     translate=(0.1, 0.1),
-                    #     scale=(0.8, 1.2),
-                    # ),
-                    transforms.ToTensor(),
-                ]
-            )
-        else:
-            self.transforms = transforms.Compose([transforms.ToTensor()])
+
+        self.transforms = transforms.Compose(
+            [
+                *_get_augmentation(augment),
+                transforms.ToTensor(),
+            ]
+        )
+
         self.patch_size = patch_size
         # self.tot_patches = patch_per_dim[0] * patch_per_dim[1]
 
     def len(self) -> int:
         if self.dataset is not None:
             return len(self.dataset)
+        else:
+            raise Exception("Dataset not provided")
 
     def get(self, idx):
         if self.dataset is not None:
@@ -80,8 +98,8 @@ class Puzzle_Dataset(pyg_data.Dataset):
         height = patch_per_dim[0] * self.patch_size
         width = patch_per_dim[1] * self.patch_size
         img = img.resize((width, height))
-
         img = self.transforms(img)
+
         xy, patches = divide_images_into_patches(img, patch_per_dim, self.patch_size)
 
         xy = einops.rearrange(xy, "x y c -> (x y) c")

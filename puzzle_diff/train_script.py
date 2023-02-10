@@ -41,6 +41,7 @@ def main(
     classifier_free_w,
     noise_weight,
     data_augmentation,
+    checkpoint_path,
 ):
     ### Define dataset
 
@@ -99,7 +100,8 @@ def main(
         logger=wandb_logger,
         callbacks=[checkpoint_callback, ModelSummary(max_depth=2)],
     )
-    trainer.fit(model, dl_train, dl_test)
+
+    trainer.fit(model, dl_train, dl_test, ckpt_path=checkpoint_path)
 
 
 if __name__ == "__main__":
@@ -122,7 +124,8 @@ if __name__ == "__main__":
     ap.add_argument("--classifier_free_w", type=float, default=0.2)
     ap.add_argument("--classifier_free_prob", type=float, default=0.0)
     ap.add_argument("--noise_weight", type=float, default=1.0)
-    ap.add_argument("--data_augmentation", type=bool, default=False)
+    ap.add_argument("--data_augmentation", type=str, default="none")
+    ap.add_argument("--checkpoint_path", type=str, default="")
 
     args = ap.parse_args()
     print(args)
@@ -140,4 +143,5 @@ if __name__ == "__main__":
         classifier_free_w=args.classifier_free_w,
         noise_weight=args.noise_weight,
         data_augmentation=args.data_augmentation,
+        checkpoint_path=args.checkpoint_path,
     )

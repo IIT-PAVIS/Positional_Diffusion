@@ -16,12 +16,14 @@ class Eff_GAT(nn.Module):
         nn (_type_): _description_
     """
 
-    def __init__(self, steps) -> None:
+    def __init__(self, steps, input_channels=2, output_channels=2) -> None:
         super().__init__()
 
         self.visual_backbone = timm.create_model(
             "efficientnet_b0", pretrained=True, features_only=True
         )
+        self.input_channels = input_channels
+        self.output_channels = output_channels
         # visual_feats = 448  # hardcoded
 
         self.combined_features_dim = 1088 + 32 + 32
@@ -39,7 +41,9 @@ class Eff_GAT(nn.Module):
             output_size=self.combined_features_dim,
         )
         self.time_emb = nn.Embedding(steps, 32)
-        self.pos_mlp = nn.Sequential(nn.Linear(2, 16), nn.GELU(), nn.Linear(16, 32))
+        self.pos_mlp = nn.Sequential(
+            nn.Linear(input_channels, 16), nn.GELU(), nn.Linear(16, 32)
+        )
         # self.GN = GraphNorm(self.combined_features_dim)
         self.mlp = nn.Sequential(
             nn.Linear(self.combined_features_dim, 128),
@@ -47,7 +51,9 @@ class Eff_GAT(nn.Module):
             nn.Linear(128, self.combined_features_dim),
         )
         self.final_mlp = nn.Sequential(
-            nn.Linear(self.combined_features_dim, 32), nn.GELU(), nn.Linear(32, 2)
+            nn.Linear(self.combined_features_dim, 32),
+            nn.GELU(),
+            nn.Linear(32, output_channels),
         )
         mean = torch.tensor([0.4850, 0.4560, 0.4060])[None, :, None, None]
         std = torch.tensor([0.2290, 0.2240, 0.2250])[None, :, None, None]

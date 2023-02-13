@@ -13,7 +13,7 @@ import string
 
 import pytorch_lightning as pl
 from dataset.dataset_utils import get_dataset, get_dataset_ROT
-from model.spatial_diffusion import GNN_Diffusion
+from model import spatial_diffusion as sd
 from pytorch_lightning.callbacks import ModelCheckpoint, ModelSummary
 from pytorch_lightning.loggers import WandbLogger
 
@@ -43,6 +43,7 @@ def main(
     data_augmentation,
     checkpoint_path,
     rotation,
+    predict_xstart,
 ):
     ### Define dataset
 
@@ -66,7 +67,7 @@ def main(
     if sampling == "DDPM":
         inference_ratio = 1
 
-    model = GNN_Diffusion(
+    model = sd.GNN_Diffusion(
         steps=steps,
         sampling=sampling,
         inference_ratio=inference_ratio,
@@ -74,6 +75,9 @@ def main(
         classifier_free_prob=classifier_free_prob,
         noise_weight=noise_weight,
         rotation=rotation,
+        model_mean_type=sd.ModelMeanType.EPISLON
+        if not predict_xstart
+        else sd.ModelMeanType.START_X,
     )
     model.initialize_torchmetrics(puzzle_sizes)
 
@@ -136,6 +140,7 @@ if __name__ == "__main__":
     ap.add_argument("--data_augmentation", type=str, default="none")
     ap.add_argument("--checkpoint_path", type=str, default="")
     ap.add_argument("--noise_weight", type=float, default=0.0)
+    ap.add_argument("--predict_xstart", type=bool, default=False)
     ap.add_argument("--rotation", type=bool, default=False)
 
     args = ap.parse_args()
@@ -156,4 +161,5 @@ if __name__ == "__main__":
         data_augmentation=args.data_augmentation,
         checkpoint_path=args.checkpoint_path,
         rotation=args.rotation,
+        predict_xstart=args.predict_xstart,
     )

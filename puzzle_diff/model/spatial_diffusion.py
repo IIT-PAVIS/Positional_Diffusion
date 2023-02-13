@@ -1,4 +1,5 @@
 import colorsys
+import enum
 import math
 
 # from .backbones.Transformer_GNN import Transformer_GNN
@@ -47,6 +48,16 @@ import wandb
 from .backbones import Dark_TFConv, Eff_GAT
 
 matplotlib.use("agg")
+
+
+class ModelMeanType(enum.Enum):
+    """
+    Which type of output the model predicts.
+    """
+
+    PREVIOUS_X = enum.auto()  # the model predicts x_{t-1}
+    START_X = enum.auto()  # the model predicts x_0
+    EPSILON = enum.auto()  # the model predicts epsilon
 
 
 def interpolate_color1d(color1, color2, fraction):
@@ -116,9 +127,6 @@ def extract(a, t, x_shape=None):
     return out[:, None]  # out.reshape(batch_size, *((1,) * (len(x_shape) - 1)))
 
 
-import torch
-
-
 @torch.jit.script
 def greedy_cost_assignment(pos1: torch.Tensor, pos2: torch.Tensor) -> torch.Tensor:
     # Compute pairwise distances between positions
@@ -172,11 +180,12 @@ class GNN_Diffusion(pl.LightningModule):
         classifier_free_w=0,
         noise_weight=0.0,
         rotation=False,
+        model_mean_type: ModelMeanType = ModelMeanType.EPSILON,
         *args,
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
-
+        self.model_mean_type = model_mean_type
         self.learning_rate = learning_rate
         self.save_and_sample_every = save_and_sample_every
         self.classifier_free_prob = classifier_free_prob
@@ -218,6 +227,14 @@ class GNN_Diffusion(pl.LightningModule):
         # calculations for diffusion q(x_t | x_{t-1}) and others
         sqrt_alphas_cumprod = torch.sqrt(self.alphas_cumprod)
         self.register_buffer("sqrt_alphas_cumprod", sqrt_alphas_cumprod)
+
+        self.register_buffer(
+            "sqrt_recip_alphas_cumprod", np.sqrt(1.0 / self.alphas_cumprod)
+        )
+        self.register_buffer(
+            "sqrt_recipm1_alphas_cumprod", np.sqrt(1.0 / self.alphas_cumprod - 1)
+        )
+
         sqrt_one_minus_alphas_cumprod = torch.sqrt(1.0 - self.alphas_cumprod)
         self.register_buffer(
             "sqrt_one_minus_alphas_cumprod", sqrt_one_minus_alphas_cumprod
@@ -365,20 +382,8 @@ class GNN_Diffusion(pl.LightningModule):
             > self.classifier_free_prob
         )
         classifier_free_patch_feats = prob[:, None] * patch_feats
-        # classifier_free_patch_feats=patch_feats@prob
-        # classifier_free_probs = (
-        #     torch.rand(patch_feats.shape[0])
-        #     .repeat_interleave(patch_feats.shape[1])
-        #     .reshape(patch_feats.shape)
-        # ).to(patch_feats.device)
 
-        # classifier_free_patch_feats = torch.where(
-        #     classifier_free_probs > self.classifier_free_prob,
-        #     patch_feats,
-        #     torch.zeros_like(patch_feats),
-        # )  # Standard conditioning is a special case when self.classifier_free_prob = 0.0
-
-        predicted_noise = self.forward_with_feats(
+        prediction = self.forward_with_feats(
             x_noisy,
             t,
             cond,
@@ -387,12 +392,17 @@ class GNN_Diffusion(pl.LightningModule):
             batch=batch,
         )
 
+        target = {
+            ModelMeanType.START_X: x_start,
+            ModelMeanType.EPSILON: noise,
+        }[self.model_mean_type]
+
         if loss_type == "l1":
-            loss = F.l1_loss(noise, predicted_noise)
+            loss = F.l1_loss(target, prediction)
         elif loss_type == "l2":
-            loss = F.mse_loss(noise, predicted_noise)
+            loss = F.mse_loss(target, prediction)
         elif loss_type == "huber":
-            loss = F.smooth_l1_loss(noise, predicted_noise)
+            loss = F.smooth_l1_loss(target, prediction)
         else:
             raise NotImplementedError()
 
@@ -502,18 +512,23 @@ class GNN_Diffusion(pl.LightningModule):
                 x, t, cond, edge_index, patch_feats=patch_feats, batch=batch
             )
 
-        # estimate x    _0
-        x_0 = (x - beta**0.5 * model_output) / alpha_prod**0.5
+        # estimate x_0
+
+        x_0 = {
+            ModelMeanType.EPSILON: (x - beta**0.5 * model_output) / alpha_prod**0.5,
+            ModelMeanType.START_X: model_output,
+        }[self.model_mean_type]
+        eps = self._predict_eps_from_xstart(x, t, x_0)
+
         variance = self._get_variance(
             t, prev_timestep
         )  # (beta_prev / beta) * (1 - alpha_prod / alpha_prod_prev)
         std_eta = eta * variance**0.5
 
         # estimate "direction to x_t"
-        pred_sample_direction = (1 - alpha_prod_prev - std_eta**2) ** (
-            0.5
-        ) * model_output
+        pred_sample_direction = (1 - alpha_prod_prev - std_eta**2) ** (0.5) * eps
 
+        # x_t-1 = a * x_0 + b * eps
         prev_sample = alpha_prod_prev ** (0.5) * x_0 + pred_sample_direction
 
         if eta > 0:
@@ -522,6 +537,11 @@ class GNN_Diffusion(pl.LightningModule):
             )
             prev_sample = prev_sample + std_eta * noise
         return prev_sample
+
+    def _predict_eps_from_xstart(self, x_t, t, pred_xstart):
+        return (
+            extract(self.sqrt_recip_alphas_cumprod, t, x_t.shape) * x_t - pred_xstart
+        ) / extract(self.sqrt_recipm1_alphas_cumprod, t, x_t.shape)
 
     # Algorithm 2 but save all images:
     @torch.no_grad()

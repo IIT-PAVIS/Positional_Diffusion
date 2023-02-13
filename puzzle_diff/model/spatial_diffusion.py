@@ -36,6 +36,7 @@ import torch.nn.functional as F
 import torch_geometric.nn.models
 import torchmetrics
 import torchvision
+import torchvision.transforms.functional as trF
 from PIL import Image
 from torch import Tensor
 from torch.optim import Adam
@@ -46,7 +47,7 @@ import wandb
 
 from .backbones import Dark_TFConv, Eff_GAT
 
-matplotlib.use("agg")
+# matplotlib.use("agg")
 
 
 def interpolate_color1d(color1, color2, fraction):
@@ -77,6 +78,18 @@ def num_to_groups(num, divisor):
     if remainder > 0:
         arr.append(remainder)
     return arr
+
+
+def rotate_images(patches, rot_vector):
+    angle_vec = rot_vector  # x_noisy[:, -2:]
+    angles = torch.atan2(angle_vec[:, 1], angle_vec[:, 0])
+    rotated_patches = torch.stack(
+        [
+            trF.rotate(cond_img, -rot.item() / torch.pi * 180)
+            for cond_img, rot in zip(patches, angles)
+        ]
+    )
+    return rotated_patches
 
 
 def cosine_beta_schedule(timesteps, s=0.08):
@@ -356,6 +369,8 @@ class GNN_Diffusion(pl.LightningModule):
             noise = torch.randn_like(x_start)
 
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
+        if self.rotation:
+            cond = rotate_images(cond, x_noisy[:, -2:])
 
         patch_feats = self.visual_features(cond)
         batch_size = batch.max() + 1
@@ -560,6 +575,9 @@ class GNN_Diffusion(pl.LightningModule):
                 patch_feats=patch_feats,
                 batch=batch,
             )
+            if self.rotation:
+                rotated_imgs = rotate_images(cond, img[:, -2:])
+                patch_feats = self.visual_features(rotated_imgs)
             # imgs.append(img)
             # if i is not None:  # == 0:
             # if i == 0:

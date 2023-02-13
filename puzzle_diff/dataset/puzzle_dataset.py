@@ -12,7 +12,9 @@ import torch_geometric.data as pyg_data
 import torch_geometric.loader
 import torchvision.transforms as transforms
 from PIL import Image
+from PIL.Image import Resampling
 from torch import Tensor
+from torchvision.transforms import InterpolationMode
 from torchvision.transforms import functional as F
 
 
@@ -29,8 +31,7 @@ def _get_augmentation(augmentation_type: str = "none"):
         "hard": [
             transforms.RandomHorizontalFlip(p=0.5),
             RandomCropAndResizedToOriginal(
-                size=(1, 1),
-                scale=(0.8, 1),
+                size=(1, 1), scale=(0.8, 1), interpolation=InterpolationMode.BICUBIC
             ),
         ],
     }
@@ -97,7 +98,7 @@ class Puzzle_Dataset(pyg_data.Dataset):
 
         height = patch_per_dim[0] * self.patch_size
         width = patch_per_dim[1] * self.patch_size
-        img = img.resize((width, height))
+        img = img.resize((width, height), resample=Resampling.BICUBIC)
         img = self.transforms(img)
 
         xy, patches = divide_images_into_patches(img, patch_per_dim, self.patch_size)
@@ -147,7 +148,8 @@ class Puzzle_Dataset_MP(Puzzle_Dataset):
 
         height = patch_per_dim[0] * self.patch_size
         width = patch_per_dim[1] * self.patch_size
-        img = img.resize((width, height))
+
+        img = img.resize((width, height), resample=Resampling.BICUBIC)
 
         img = self.transforms(img)
         xy, patches = divide_images_into_patches(img, patch_per_dim, self.patch_size)
@@ -203,7 +205,8 @@ class Puzzle_Dataset_ROT(Puzzle_Dataset):
 
         height = patch_per_dim[0] * self.patch_size
         width = patch_per_dim[1] * self.patch_size
-        img = img.resize((width, height))
+
+        img = img.resize((width, height), resample=Resampling.BICUBIC)
 
         img = self.transforms(img)
         xy, patches = divide_images_into_patches(img, patch_per_dim, self.patch_size)

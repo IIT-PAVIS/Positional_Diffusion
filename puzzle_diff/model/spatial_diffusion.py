@@ -37,6 +37,7 @@ import torch_geometric.nn.models
 import torchmetrics
 import torchvision
 import torchvision.transforms.functional as trF
+from kornia.geometry.transform import Rotate as krot
 from PIL import Image
 from torch import Tensor
 from torch.optim import Adam
@@ -82,14 +83,14 @@ def num_to_groups(num, divisor):
 
 def rotate_images(patches, rot_vector):
     angle_vec = rot_vector  # x_noisy[:, -2:]
-    angles = torch.atan2(angle_vec[:, 1], angle_vec[:, 0])
-    rotated_patches = torch.stack(
-        [
-            trF.rotate(cond_img, -rot.item() / torch.pi * 180)
-            for cond_img, rot in zip(patches, angles)
-        ]
-    )
-    return rotated_patches
+    angles = -torch.atan2(angle_vec[:, 1], angle_vec[:, 0]) / torch.pi * 180
+    # rotated_patches = torch.stack(
+    #     [trF.rotate(cond_img, rot.item()) for cond_img, rot in zip(patches, angles)]
+    # )
+
+    r = krot(angles, mode="nearest")
+    rot2 = r(patches)
+    return rot2
 
 
 def cosine_beta_schedule(timesteps, s=0.08):

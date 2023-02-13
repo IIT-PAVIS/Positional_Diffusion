@@ -47,7 +47,7 @@ import wandb
 
 from .backbones import Dark_TFConv, Eff_GAT
 
-# matplotlib.use("agg")
+matplotlib.use("agg")
 
 
 def interpolate_color1d(color1, color2, fraction):

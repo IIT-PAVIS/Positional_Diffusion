@@ -387,8 +387,9 @@ class GNN_Diffusion(pl.LightningModule):
             noise = torch.randn_like(x_start)
 
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
-        if self.rotation:
-            cond = rotate_images(cond, x_noisy[:, -2:])
+        # rotation of middle images doesn't work
+        # if self.rotation:
+        #     cond = rotate_images(cond, x_noisy[:, -2:])
 
         patch_feats = self.visual_features(cond)
         batch_size = batch.max() + 1
@@ -596,9 +597,11 @@ class GNN_Diffusion(pl.LightningModule):
                 patch_feats=patch_feats,
                 batch=batch,
             )
-            if self.rotation:
-                rotated_imgs = rotate_images(cond, img[:, -2:])
-                patch_feats = self.visual_features(rotated_imgs)
+            # uncomment to rotate images during sampling
+            # if self.rotation:
+            #     rotated_imgs = rotate_images(cond, img[:, -2:])
+            #     patch_feats = self.visual_features(rotated_imgs)
+
             # imgs.append(img)
             # if i is not None:  # == 0:
             # if i == 0:

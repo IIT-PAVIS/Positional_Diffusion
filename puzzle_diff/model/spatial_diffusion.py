@@ -657,7 +657,7 @@ class GNN_Diffusion(pl.LightningModule):
         loss = self.p_losses(
             batch.x,
             new_t,
-            loss_type="l1",
+            loss_type="huber",
             cond=batch.patches,
             edge_index=batch.edge_index,
             batch=batch.batch,

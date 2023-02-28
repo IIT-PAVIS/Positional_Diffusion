@@ -387,9 +387,8 @@ class GNN_Diffusion(pl.LightningModule):
             noise = torch.randn_like(x_start)
 
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
-        # rotation of middle images doesn't work
-        # if self.rotation:
-        #     cond = rotate_images(cond, x_noisy[:, -2:])
+        if self.steps == 1:  # Transformer case
+            x_noisy = torch.zeros_like(x_noisy)
 
         patch_feats = self.visual_features(cond)
         batch_size = batch.max() + 1
@@ -540,6 +539,7 @@ class GNN_Diffusion(pl.LightningModule):
         variance = self._get_variance(
             t, prev_timestep
         )  # (beta_prev / beta) * (1 - alpha_prod / alpha_prod_prev)
+
         std_eta = eta * variance**0.5
 
         # estimate "direction to x_t"

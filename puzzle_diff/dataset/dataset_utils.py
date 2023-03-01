@@ -1,10 +1,13 @@
 from torchvision.datasets import CIFAR100
 
 from .celeba_dt import CelebA_HQ
+from .nips_dt import Nips_dt
 from .puzzle_dataset import Puzzle_Dataset, Puzzle_Dataset_MP, Puzzle_Dataset_ROT
+from .text_dataset import Text_dataset
 from .wikiart_dt import Wikiart_DT
 
 ALLOWED_DT = ["celeba", "cifar100", "wikiart"]
+ALLOWED_TEXT = ["nips"]
 
 
 def get_dataset(dataset: str, puzzle_sizes: list, augment=False) -> tuple:
@@ -223,3 +226,18 @@ def get_dataset_old(
     )
 
     return (puzzleDt_train, puzzleDt_test, real_puzzle_sizes)
+
+
+def get_dataset_text(dataset: str):
+    assert dataset in ALLOWED_TEXT
+
+    if dataset == "nips":
+        train_dt = Nips_dt(split="train")
+        val_dt = Nips_dt(split="val")
+        test_dt = Nips_dt(split="test")
+
+    train_dt = Text_dataset(train_dt)
+    val_dt = Text_dataset(val_dt)
+    test_dt = Text_dataset(test_dt)
+
+    return train_dt, val_dt, test_dt

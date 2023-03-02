@@ -5,7 +5,7 @@ from torch import Tensor
 from torch_geometric.nn import GraphNorm
 
 from .Transformer_GNN import Transformer_GNN
-
+from transformers import BartModel, BartTokenizer
 
 class Eff_GAT_TEXT(nn.Module):
     """
@@ -16,19 +16,19 @@ class Eff_GAT_TEXT(nn.Module):
         nn (_type_): _description_
     """
 
-    def __init__(self, steps, input_channels=1, output_channels=1) -> None:
+    def __init__(self, steps, input_channels=1, output_channels=1, model='facebook/bart-large') -> None:
         super().__init__()
 
         self.input_channels = input_channels
         self.output_channels = output_channels
 
-        from transformers import BartModel, BartTokenizer
 
-        self.tokenizer = BartTokenizer.from_pretrained("facebook/bart-base")
-        self.text_encoder = BartModel.from_pretrained("facebook/bart-base")
+        self.tokenizer = BartTokenizer.from_pretrained(model)
+        self.text_encoder = BartModel.from_pretrained(model)
         self.text_encoder.return_dict = True
 
-        self.combined_features_dim = 768 + 32 + 32
+        
+        self.combined_features_dim = {'facebook/bart-base': 768, 'facebook/bart-large':1024}[model] + 32 + 32
 
         # self.gnn_backbone = torch_geometric.nn.models.GAT(
         #     in_channels=self.combined_features_dim,
@@ -105,14 +105,12 @@ class Eff_GAT_TEXT(nn.Module):
         return final_feats
 
     def visual_features(self, patch_rgb):
-        # with torch.no_grad():
-        phrases = [y for x in patch_rgb for y in x]
-        tokens = self.tokenizer(phrases, return_tensors="pt", padding=True).to(
-            self.text_encoder.device
-        )
-        text_emb = self.text_encoder(**tokens)
-        feats = text_emb["last_hidden_state"][:, 0, :]
-        # patch_feats = self.visual_backbone.forward(patch_rgb)[3].reshape(
-        # patch_rgb.shape[0], -1
-        # )
+        with torch.no_grad():
+            phrases = [y for x in patch_rgb for y in x]
+            tokens = self.tokenizer(phrases, return_tensors="pt", padding=True).to(
+                self.text_encoder.device
+            )
+            text_emb = self.text_encoder(**tokens)
+            feats = text_emb["last_hidden_state"][:, 0, :]
+
         return feats

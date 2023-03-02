@@ -652,36 +652,37 @@ class GNN_Diffusion(pl.LightningModule):
     def configure_optimizers(self):
         # optimizer = torch.optim.Adagrad(self.parameters(), lr=self.learning_rate)
         # optimizer = Adafactor(self.parameters())
-        # optimizer = Adafactor(self.parameters())
+        optimizer = Adafactor(self.parameters())
+        return optimizer
 
-        optimizer = AdamW(self.parameters(), lr=5e-6)
-        scheduler = get_linear_schedule_with_warmup(
-            optimizer,
-            num_warmup_steps=self.warmup_steps,
-            num_training_steps=self.max_train_steps,
-        )
+        # optimizer = AdamW(self.parameters(), lr=5e-6)
+        # scheduler = get_linear_schedule_with_warmup(
+        #     optimizer,
+        #     num_warmup_steps=self.warmup_steps,
+        #     num_training_steps=self.max_train_steps,
+        # )
 
-        lr_scheduler_config = {
-            # REQUIRED: The scheduler instance
-            "scheduler": scheduler,
-            # The unit of the scheduler's step size, could also be 'step'.
-            # 'epoch' updates the scheduler on epoch end whereas 'step'
-            # updates it after a optimizer update.
-            "interval": "step",
-            # How many epochs/steps should pass between calls to
-            # `scheduler.step()`. 1 corresponds to updating the learning
-            # rate after every epoch/step.
-            "frequency": 1,
-            # Metric to to monitor for schedulers like `ReduceLROnPlateau`
-            # If set to `True`, will enforce that the value specified 'monitor'
-            # is available when the scheduler is updated, thus stopping
-            # training if not found. If set to `False`, it will only produce a warning
-            "strict": True,
-            # If using the `LearningRateMonitor` callback to monitor the
-            # learning rate progress, this keyword can be used to specify
-            # a custom logged name
-        }
-        return [optimizer], [lr_scheduler_config]
+        # lr_scheduler_config = {
+        #     # REQUIRED: The scheduler instance
+        #     "scheduler": scheduler,
+        #     # The unit of the scheduler's step size, could also be 'step'.
+        #     # 'epoch' updates the scheduler on epoch end whereas 'step'
+        #     # updates it after a optimizer update.
+        #     "interval": "step",
+        #     # How many epochs/steps should pass between calls to
+        #     # `scheduler.step()`. 1 corresponds to updating the learning
+        #     # rate after every epoch/step.
+        #     "frequency": 1,
+        #     # Metric to to monitor for schedulers like `ReduceLROnPlateau`
+        #     # If set to `True`, will enforce that the value specified 'monitor'
+        #     # is available when the scheduler is updated, thus stopping
+        #     # training if not found. If set to `False`, it will only produce a warning
+        #     "strict": True,
+        #     # If using the `LearningRateMonitor` callback to monitor the
+        #     # learning rate progress, this keyword can be used to specify
+        #     # a custom logged name
+        # }
+        # return [optimizer], [lr_scheduler_config]
 
     def training_step(self, batch, batch_idx):
         # return super().training_step(*args, **kwargs)

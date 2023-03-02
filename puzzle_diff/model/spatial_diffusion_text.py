@@ -274,7 +274,8 @@ class GNN_Diffusion(pl.LightningModule):
         # for i in n_patches:
         #     metrics[f"{i}_acc"] = torchmetrics.MeanMetric()
         #     metrics[f"{i}_nImages"] = torchmetrics.SumMetric()
-        metrics["overall_acc"] = torchmetrics.MeanMetric()
+        metrics["accuracy"] = torchmetrics.MeanMetric()
+        metrics["pmr"] = torchmetrics.MeanMetric()
         metrics["overall_nImages"] = torchmetrics.SumMetric()
         self.metrics = nn.ModuleDict(metrics)
 
@@ -721,11 +722,11 @@ class GNN_Diffusion(pl.LightningModule):
                 if ((pos[1:] - pos[:-1]) > 0).all():
                     correct = True
 
-                if correct:
-                    self.metrics["overall_acc"].update(1)
-                else:
-                    self.metrics["overall_acc"].update(0)
-
+                match =  torch.argsort(pos.squeeze()) == torch.arange(len(pos)).to(batch.x.device)
+                pmr = match.all().float()
+                acc = match.float().mean()
+                self.metrics['accuracy'].update(acc)
+                self.metrics["pmr"].update(pmr)
             # for i in range(batch.batch.max() + 1):
             #     idx = torch.where(batch.batch == i)[0]
             #     patches_rgb = batch.patches[idx]

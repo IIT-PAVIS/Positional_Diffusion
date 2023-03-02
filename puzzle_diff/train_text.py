@@ -82,16 +82,13 @@ def main(
         tags=tags,
     )
 
-    checkpoint_callback = ModelCheckpoint(
-        monitor="overall_acc", mode="max", save_top_k=2
-    )
+    checkpoint_callback = ModelCheckpoint(monitor="pmr", mode="max", save_top_k=2)
 
     trainer = pl.Trainer(
         accelerator="gpu",
         devices=gpus,
         strategy="ddp" if gpus > 1 else None,
         check_val_every_n_epoch=1,
-        accumulate_grad_batches=20,
         logger=wandb_logger,
         callbacks=[checkpoint_callback, ModelSummary(max_depth=2)],
     )

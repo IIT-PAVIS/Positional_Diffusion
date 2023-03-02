@@ -3,9 +3,10 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 from torch_geometric.nn import GraphNorm
+from transformers import BartModel, BartTokenizer
 
 from .Transformer_GNN import Transformer_GNN
-from transformers import BartModel, BartTokenizer
+
 
 class Eff_GAT_TEXT(nn.Module):
     """
@@ -16,19 +17,42 @@ class Eff_GAT_TEXT(nn.Module):
         nn (_type_): _description_
     """
 
-    def __init__(self, steps, input_channels=1, output_channels=1, model='facebook/bart-large') -> None:
+    def __init__(
+        self, steps, input_channels=1, output_channels=1, model="facebook/bart-large"
+    ) -> None:
         super().__init__()
 
         self.input_channels = input_channels
         self.output_channels = output_channels
 
-
         self.tokenizer = BartTokenizer.from_pretrained(model)
         self.text_encoder = BartModel.from_pretrained(model)
         self.text_encoder.return_dict = True
 
-        
-        self.combined_features_dim = {'facebook/bart-base': 768, 'facebook/bart-large':1024}[model] + 32 + 32
+        self.trans_features_dim = {
+            "facebook/bart-base": 768,
+            "facebook/bart-large": 1024,
+        }[model]
+
+        self.transformer_encoder_layer = torch.nn.TransformerEncoderLayer(
+            self.trans_features_dim,
+            8,
+            dim_feedforward=2048,
+            dropout=0.1,
+            activation="gelu",
+            layer_norm_eps=1e-05,
+            batch_first=True,
+            norm_first=False,
+            device=None,
+            dtype=None,
+        )
+        self.transformer_encode = torch.nn.TransformerEncoder(
+            self.transformer_encoder_layer, 2
+        )
+
+        self.combined_features_dim = (
+            {"facebook/bart-base": 768, "facebook/bart-large": 1024}[model] + 32 + 32
+        )
 
         # self.gnn_backbone = torch_geometric.nn.models.GAT(
         #     in_channels=self.combined_features_dim,
@@ -110,7 +134,9 @@ class Eff_GAT_TEXT(nn.Module):
             tokens = self.tokenizer(phrases, return_tensors="pt", padding=True).to(
                 self.text_encoder.device
             )
-            text_emb = self.text_encoder(**tokens)
-            feats = text_emb["last_hidden_state"][:, 0, :]
+            text_emb = self.text_encoder(**tokens)["last_hidden_state"]
 
-        return feats
+        attn_mask = (1 - tokens["attention_mask"]).bool()
+        feats = self.transformer_encode(text_emb, src_key_padding_mask=attn_mask)
+
+        return feats[:, 0, :]

@@ -40,6 +40,7 @@ import torchvision
 import torchvision.transforms.functional as trF
 from kornia.geometry.transform import Rotate as krot
 from PIL import Image
+from scipy.stats import kendalltau
 from torch import Tensor
 from torch.optim import Adam
 from tqdm import tqdm
@@ -275,6 +276,7 @@ class GNN_Diffusion(pl.LightningModule):
         #     metrics[f"{i}_acc"] = torchmetrics.MeanMetric()
         #     metrics[f"{i}_nImages"] = torchmetrics.SumMetric()
         metrics["accuracy"] = torchmetrics.MeanMetric()
+        metrics["tau"] = torchmetrics.MeanMetric()
         metrics["pmr"] = torchmetrics.MeanMetric()
         metrics["overall_nImages"] = torchmetrics.SumMetric()
         self.metrics = nn.ModuleDict(metrics)
@@ -722,10 +724,18 @@ class GNN_Diffusion(pl.LightningModule):
                 if ((pos[1:] - pos[:-1]) > 0).all():
                     correct = True
 
-                match =  torch.argsort(pos.squeeze()) == torch.arange(len(pos)).to(batch.x.device)
+                match = torch.argsort(pos.squeeze()) == torch.arange(len(pos)).to(
+                    batch.x.device
+                )
                 pmr = match.all().float()
                 acc = match.float().mean()
-                self.metrics['accuracy'].update(acc)
+
+                tau = kendall_tau(
+                    torch.argsort(pos.squeeze()).cpu().numpy(), np.arange(len(pos))
+                )
+
+                self.metrics["accuracy"].update(acc)
+                self.metrics["tau"].update(tau)
                 self.metrics["pmr"].update(pmr)
             # for i in range(batch.batch.max() + 1):
             #     idx = torch.where(batch.batch == i)[0]
@@ -1016,3 +1026,33 @@ class GNN_Diffusion(pl.LightningModule):
 
         plt.savefig(f"{file_name}/asd_{self.current_epoch}-{ind_name}.png")
         plt.close()
+
+
+def kendall_tau(order, ground_truth):
+    """
+    Computes the kendall's tau metric
+    between the predicted sentence order and true order
+    Input:
+            order: list of ints denoting the predicted output order
+            ground_truth: list of ints denoting the true sentence order
+
+    Returns:
+            kendall's tau - float
+    """
+
+    if len(ground_truth) == 1:
+        if ground_truth[0] == order[0]:
+            return 1.0
+
+    reorder_dict = {}
+
+    for i in range(len(ground_truth)):
+        reorder_dict[ground_truth[i]] = i
+
+    new_order = [0] * len(order)
+    for i in range(len(new_order)):
+        if order[i] in reorder_dict.keys():
+            new_order[i] = reorder_dict[order[i]]
+
+    corr, _ = kendalltau(new_order, list(range(len(order))))
+    return corr

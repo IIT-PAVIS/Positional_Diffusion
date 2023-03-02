@@ -3,11 +3,12 @@ from torchvision.datasets import CIFAR100
 from .celeba_dt import CelebA_HQ
 from .nips_dt import Nips_dt
 from .puzzle_dataset import Puzzle_Dataset, Puzzle_Dataset_MP, Puzzle_Dataset_ROT
+from .sind_dt import Sind_dt
 from .text_dataset import Text_dataset
 from .wikiart_dt import Wikiart_DT
 
 ALLOWED_DT = ["celeba", "cifar100", "wikiart"]
-ALLOWED_TEXT = ["nips"]
+ALLOWED_TEXT = ["nips", "sind"]
 
 
 def get_dataset(dataset: str, puzzle_sizes: list, augment=False) -> tuple:
@@ -235,6 +236,10 @@ def get_dataset_text(dataset: str):
         train_dt = Nips_dt(split="train")
         val_dt = Nips_dt(split="val")
         test_dt = Nips_dt(split="test")
+    elif dataset == "sind":
+        train_dt = Sind_dt(split="train")
+        val_dt = Sind_dt(split="val")
+        test_dt = Sind_dt(split="test")
 
     train_dt = Text_dataset(train_dt)
     val_dt = Text_dataset(val_dt)

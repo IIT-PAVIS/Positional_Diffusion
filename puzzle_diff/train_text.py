@@ -54,6 +54,9 @@ def main(
     if sampling == "DDPM":
         inference_ratio = 1
 
+    epoch_steps = len(dl_train) * 10
+    max_steps = len(dl_train) * 100
+
     model = sd.GNN_Diffusion(
         steps=steps,
         sampling=sampling,
@@ -61,6 +64,8 @@ def main(
         model_mean_type=sd.ModelMeanType.EPISLON
         if not predict_xstart
         else sd.ModelMeanType.START_X,
+        warmup_steps=epoch_steps,
+        max_train_steps=max_steps,
     )
     model.initialize_torchmetrics()
 

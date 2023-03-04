@@ -36,6 +36,7 @@ class Sind_Vist_dt(Dataset):
         images_path = Path(f"/data/vist/images")
         if download:
             download_images(data_path)
+        resize_data(data_path, images_path)
         self.examples = load_data(data_path, images_path)
 
     def __len__(self):
@@ -86,6 +87,50 @@ def load_data(in_file, images_path: Path):
     return rows
 
 
+### Reordering task
+def resize_data(in_file, images_path: Path):
+    """
+    Loads the dataset file:
+    in_file: json file
+    Returns a list of tuples (input, output)
+    """
+    all_lines = []
+    with open(in_file, "r", encoding="utf-8") as f:
+        for line in f:
+            all_lines.append(json.loads(line))
+    annotations = all_lines[0]["annotations"]
+
+    rows = []
+    count = 0
+
+    def resize_img(img_path):
+        if not img_path.exists():
+            return
+        if Path(f"/data/dst/{img_path.name}").exists():
+            return
+
+        try:
+            img = Image.open(img_path).resize((64, 64)).convert("RGB")
+            img.save(f"/data/dst/{img_path.name}")
+        except:
+            return
+
+    images = []
+    for i in tqdm(range(0, len(annotations), 5)):
+        line = [annotations[i + d][0]["original_text"] for d in range(5)]
+        img_for_line = []
+
+        for d in range(5):
+            img_path = Path(
+                str(images_path / f"{annotations[i+d][0]['photo_flickr_id']}.jpg")
+            )
+            images.append(img_path)
+
+    thread_map(resize_img, images)
+
+    return rows
+
+
 def download_images(in_file):
     all_lines = []
     correct_annotations = {}
@@ -104,7 +149,7 @@ def download_images(in_file):
 
 if __name__ == "__main__":
 
-    dt = Sind_Vist_dt(download=False, split="test")
+    dt = Sind_Vist_dt(download=False, split="train")
     x = dt[100]
 
     print(x)

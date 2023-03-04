@@ -283,6 +283,7 @@ class GNN_Diffusion(pl.LightningModule):
         metrics["sp"] = torchmetrics.MeanMetric()
         metrics["pairwise"] = torchmetrics.MeanMetric()
         metrics["hamming"] = torchmetrics.MeanMetric()
+        metrics["distance"] = torchmetrics.MeanMetric()
         self.metrics = nn.ModuleDict(metrics)
 
     def forward(self, xy_pos, time, sentences, frames, edge_index, batch) -> Any:
@@ -669,6 +670,9 @@ class GNN_Diffusion(pl.LightningModule):
                 )
                 self.metrics["hamming"].update(ham)
 
+                abs_dist = absolute_distance(pos.squeeze().cpu().numpy())
+                self.metrics["distance"].update(abs_dist)
+
             self.log_dict(self.metrics)
 
     def validation_epoch_end(self, outputs) -> None:
@@ -941,3 +945,7 @@ def pairwise_acc(story):
             if story[idx1] < story[idx2]:
                 correct += 1
     return correct / total
+
+
+def absolute_distance(story):
+    return np.mean(np.abs(np.array(story) - np.array([0, 1, 2, 3, 4])))

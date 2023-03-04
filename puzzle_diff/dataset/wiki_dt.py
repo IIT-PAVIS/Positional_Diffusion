@@ -16,7 +16,7 @@ class Wiki_dt(Dataset):
         split_len = 0.8 if split == "train" else ".2"
         rows = load_data(data_path)
         random.Random(SEED).shuffle(rows)
-        self.examples = rows[: int(len(self.examples) * split_len)]
+        self.examples = rows[: int(len(rows) * split_len)]
 
     def __len__(self):
         return len(self.examples)

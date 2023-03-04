@@ -201,6 +201,7 @@ class GNN_Diffusion(pl.LightningModule):
         model_mean_type: ModelMeanType = ModelMeanType.EPSILON,
         warmup_steps=1000,
         max_train_steps=10000,
+        correct_positions=False,
         *args,
         **kwargs,
     ) -> None:
@@ -279,9 +280,6 @@ class GNN_Diffusion(pl.LightningModule):
     def initialize_torchmetrics(self):
         metrics = {}
 
-        # for i in n_patches:
-        #     metrics[f"{i}_acc"] = torchmetrics.MeanMetric()
-        #     metrics[f"{i}_nImages"] = torchmetrics.SumMetric()
         metrics["sp"] = torchmetrics.MeanMetric()
         metrics["pairwise"] = torchmetrics.MeanMetric()
         metrics["hamming"] = torchmetrics.MeanMetric()

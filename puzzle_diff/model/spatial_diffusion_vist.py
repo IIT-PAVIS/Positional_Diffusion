@@ -297,7 +297,6 @@ class GNN_Diffusion(pl.LightningModule):
         text_feats: Tensor,
         frames_feats: Tensor,
         edge_index: Tensor,
-        patch_feats: Tensor,
         batch,
     ) -> Any:
         return self.model.forward_with_feats(
@@ -306,7 +305,7 @@ class GNN_Diffusion(pl.LightningModule):
 
     def get_features(self, sentences, frames):
         frames_feats = self.model.visual_features(frames)
-        text_feats = self.text_features(sentences)
+        text_feats = self.model.text_features(sentences)
         return {"text_feats": text_feats, "frames_feats": frames_feats}
 
     # forward diffusion
@@ -337,11 +336,11 @@ class GNN_Diffusion(pl.LightningModule):
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
         feats = self.get_features(**cond)
 
+        breakpoint()
         prediction = self.forward_with_feats(
             x_noisy,
-            t,
-            cond,
-            edge_index,
+            time=t,
+            edge_index=edge_index,
             **feats,
             batch=batch,
         )
@@ -624,7 +623,7 @@ class GNN_Diffusion(pl.LightningModule):
             batch.x,
             new_t,
             loss_type="huber",
-            cond=[batch.phrases_text, batch.frames],
+            cond={"sentences": batch.phrases_text, "frames": batch.frames},
             edge_index=batch.edge_index,
             batch=batch.batch,
         )

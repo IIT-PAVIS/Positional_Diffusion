@@ -1,4 +1,5 @@
 import glob
+import imghdr
 import json
 import os
 import pickle
@@ -6,17 +7,25 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import requests
+from matplotlib import pyplot as plt
 from PIL import Image
 from torch.utils.data import Dataset
 from tqdm import tqdm
-from tqdm.contrib.concurrent import process_map  # or thread_map
+from tqdm.contrib.concurrent import thread_map  # or thread_map
 
 
 def download_img(image_url):
-    req = requests.get(image_url)
+
     id_jpg = image_url.split("/")[-1].split("_")[0] + ".jpg"
+    img_path = Path(f"/data/vist/images/{id_jpg}")
+    if img_path.exists():
+        return
+    req = requests.get(image_url)
     img_data = req.content
-    with open(f"/data/sind/images/{id_jpg}", "wb") as handler:
+    if req.status_code != 200:
+        print(image_url)
+        return
+    with open(f"/data/vist/images/{id_jpg}", "wb") as handler:
         handler.write(img_data)
 
 
@@ -52,24 +61,23 @@ def load_data(in_file, images_path: Path):
     annotations = all_lines[0]["annotations"]
 
     rows = []
-
+    count = 0
     for i in range(0, len(annotations), 5):
         line = [annotations[i + d][0]["original_text"] for d in range(5)]
         img_for_line = []
-
         for d in range(5):
-            breakpoint()
             img_path = Path(
                 str(images_path / f"{annotations[i+d][0]['photo_flickr_id']}.jpg")
             )
             if not img_path.exists():
                 break
+
             img_for_line.append(img_path)
 
         if len(img_for_line) != len(line):
             break
         rows.append((img_for_line, line))
-
+    breakpoint()
     return rows
 
 
@@ -86,10 +94,15 @@ def download_images(in_file):
         elif "url_m" in x:
             images.append(x["url_m"])
 
-    process_map(download_img, images, chunksize=1)
+    thread_map(download_img, images)
 
 
 if __name__ == "__main__":
 
     dt = Sind_Vist_dt(download=True, split="train")
-    print(dt[0])
+    x = dt[100]
+    for i, text in zip(x[0], x[1]):
+        plt.figure()
+        plt.title(text)
+        plt.imshow(i)
+        plt.show()

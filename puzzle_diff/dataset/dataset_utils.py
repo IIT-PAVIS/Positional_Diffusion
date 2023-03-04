@@ -8,10 +8,11 @@ from .sind_dt import Sind_dt
 from .sind_vist_dt import Sind_Vist_dt
 from .text_dataset import Text_dataset
 from .vist_dataset import Vist_dataset
+from .wiki_dt import Wiki_dt
 from .wikiart_dt import Wikiart_DT
 
 ALLOWED_DT = ["celeba", "cifar100", "wikiart"]
-ALLOWED_TEXT = ["nips", "sind", "roc"]
+ALLOWED_TEXT = ["nips", "sind", "roc", "wiki"]
 
 
 def get_dataset(dataset: str, puzzle_sizes: list, augment=False) -> tuple:
@@ -247,6 +248,10 @@ def get_dataset_text(dataset: str):
         train_dt = Roc_dt(split="train")
         val_dt = Roc_dt(split="test")
         test_dt = Roc_dt(split="test")
+    elif dataset == "wiki":
+        train_dt = Wiki_dt(split="train")
+        val_dt = Wiki_dt(split="test")
+        test_dt = Wiki_dt(split="test")
     else:
         raise Exception(f"Dataset {dataset} is not provided.")
 

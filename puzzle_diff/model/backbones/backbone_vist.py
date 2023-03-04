@@ -52,14 +52,17 @@ class Eff_GAT_Vist(nn.Module):
         self.visual_backbone = timm.create_model(
             "efficientnet_b0", pretrained=True, features_only=True
         )
-
+        visual_backbone_feat_dim = 10240
         mean = torch.tensor([0.4850, 0.4560, 0.4060])[None, :, None, None]
         std = torch.tensor([0.2290, 0.2240, 0.2250])[None, :, None, None]
         self.register_buffer("mean", mean)
         self.register_buffer("std", std)
 
         self.combined_features_dim = (
-            {"facebook/bart-base": 768, "facebook/bart-large": 1024}[model] + 32 + 32
+            {"facebook/bart-base": 768, "facebook/bart-large": 1024}[model]
+            + visual_backbone_feat_dim
+            + 32
+            + 32
         )
 
         # self.gnn_backbone = torch_geometric.nn.models.GAT(
@@ -120,7 +123,7 @@ class Eff_GAT_Vist(nn.Module):
     ):
         time_feats = self.time_emb(time)  # embedding, int -> 32
         pos_feats = self.pos_mlp(xy_pos)  # MLP, (x, y) -> 32
-
+        breakpoint()
         # COMBINE  and transform with MLP
         combined_feats = torch.cat(
             [text_feats, frames_feats, pos_feats, time_feats], -1
@@ -151,13 +154,13 @@ class Eff_GAT_Vist(nn.Module):
         return feats[:, 0, :]
 
     def visual_features(self, frames):
-        patch_rgb = (patch_rgb - self.mean) / self.std
+        frames = (frames - self.mean) / self.std
 
         feats = self.visual_backbone.forward(frames)
+
         patch_feats = torch.cat(
             [
-                feats[2].reshape(patch_rgb.shape[0], -1),
-                feats[3].reshape(patch_rgb.shape[0], -1),
+                feats[2].reshape(frames.shape[0], -1),  # 10240
             ],
             -1,
         )

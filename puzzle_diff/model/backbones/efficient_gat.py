@@ -103,7 +103,7 @@ class Eff_GAT(nn.Module):
 
     def visual_features(self, patch_rgb):
         patch_rgb = (patch_rgb - self.mean) / self.std
-
+        breakpoint()
         feats = self.visual_backbone.forward(patch_rgb)
         patch_feats = torch.cat(
             [

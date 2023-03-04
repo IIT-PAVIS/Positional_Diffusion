@@ -109,7 +109,7 @@ if __name__ == "__main__":
     ap.add_argument("-gpus", type=int, default=1)
     ap.add_argument("-steps", type=int, default=100)
     ap.add_argument("-num_workers", type=int, default=8)
-    ap.add_argument("-dataset", default="nips", choices=["nips", "sind", "roc"])
+    ap.add_argument("-dataset", default="nips", choices=["nips", "sind", "roc", "wiki"])
     ap.add_argument("-sampling", default="DDIM", choices=["DDPM", "DDIM"])
     ap.add_argument("-inference_ratio", type=int, default=10)
     ap.add_argument("--offline", action="store_true", default=False)

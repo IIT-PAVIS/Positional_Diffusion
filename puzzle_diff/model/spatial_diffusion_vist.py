@@ -40,6 +40,7 @@ import torchvision
 import torchvision.transforms.functional as trF
 from kornia.geometry.transform import Rotate as krot
 from PIL import Image
+from scipy.spatial.distance import hamming
 from scipy.stats import kendalltau
 from torch import Tensor
 from torch.optim import Adam
@@ -272,7 +273,7 @@ class GNN_Diffusion(pl.LightningModule):
 
         ### BACKBONE
         self.model = Eff_GAT_Vist(steps=steps, input_channels=1, output_channels=1)
-
+        self.initialize_torchmetrics()
         self.save_hyperparameters()
 
     def initialize_torchmetrics(self):
@@ -282,9 +283,8 @@ class GNN_Diffusion(pl.LightningModule):
         #     metrics[f"{i}_acc"] = torchmetrics.MeanMetric()
         #     metrics[f"{i}_nImages"] = torchmetrics.SumMetric()
         metrics["sp"] = torchmetrics.MeanMetric()
-        metrics["tau"] = torchmetrics.MeanMetric()
-        metrics["pmr"] = torchmetrics.MeanMetric()
-        metrics["overall_nImages"] = torchmetrics.SumMetric()
+        metrics["pairwise"] = torchmetrics.MeanMetric()
+        metrics["hamming"] = torchmetrics.MeanMetric()
         self.metrics = nn.ModuleDict(metrics)
 
     def forward(self, xy_pos, time, sentences, frames, edge_index, batch) -> Any:
@@ -656,13 +656,22 @@ class GNN_Diffusion(pl.LightningModule):
             for i in range(batch.batch.max() + 1):
                 pos = img[batch.batch == i]
 
-                self.metrics["overall_nImages"].update(1)
-
                 sp = scipy.stats.spearmanr(
                     torch.argsort(pos.squeeze().cpu()), torch.arange(len(pos))
                 )
 
                 self.metrics["sp"].update(sp)
+                pairwise = count_greater_elements(
+                    torch.argsort(pos.squeeze().cpu())
+                ).numpy()
+
+                self.metrics["pairwise"].update(pairwise)
+
+                ham = hamming(
+                    torch.argsort(pos.squeeze().cpu()).numpy(), torch.arange(len(pos))
+                )
+                self.metrics["hamming"].update(ham)
+
             self.log_dict(self.metrics)
 
     def validation_epoch_end(self, outputs) -> None:
@@ -906,37 +915,22 @@ def kendall_tau(order, ground_truth):
     return corr
 
 
-import torch
-
-
-def pairwise_accuracy(predictions, targets):
+def count_greater_elements(x):
     """
-    Computes pairwise accuracy between predictions and targets.
+    Given a tensor x of N elements, counts the number of times that each element of x[i] is greater than x[i+1:N],
+    and normalizes the count by the total number of comparisons.
 
     Args:
-    - predictions (torch.Tensor): tensor of predicted values of shape (batch_size, num_classes)
-    - targets (torch.Tensor): tensor of true values of shape (batch_size, num_classes)
+    - x (torch.Tensor): input tensor of shape (N,)
 
     Returns:
-    - accuracy (float): pairwise accuracy
+    - count_norm (torch.Tensor): tensor of shape (N,) containing the normalized count of greater elements for each element of x
     """
-
-    # Get the number of elements in the batch
-    batch_size = predictions.size(0)
-
-    # Compute the pairwise orderings for predictions and targets
-    pred_orderings = torch.argsort(predictions, dim=1, descending=True)
-    target_orderings = torch.argsort(targets, dim=1, descending=True)
-
-    # Compute the pairwise accuracy
-    num_correct = 0
-    for i in range(batch_size):
-        for j in range(i + 1, batch_size):
-            if (pred_orderings[i] > pred_orderings[j]) == (
-                target_orderings[i] > target_orderings[j]
-            ):
-                num_correct += 1
-
-    accuracy = num_correct / (batch_size * (batch_size - 1) / 2)
-
-    return accuracy
+    N = x.size(0)
+    count = torch.zeros(N, dtype=torch.long)
+    total_comparisons = 0
+    for i in range(N - 1):
+        count[i] = torch.sum(x[i] > x[i + 1 :])
+        total_comparisons += N - i - 1
+    count_norm = count.float() / total_comparisons
+    return count_norm

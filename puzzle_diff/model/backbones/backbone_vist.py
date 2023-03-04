@@ -52,7 +52,7 @@ class Eff_GAT_Vist(nn.Module):
         self.visual_backbone = timm.create_model(
             "efficientnet_b0", pretrained=True, features_only=True
         )
-        visual_backbone_feat_dim = 1088
+        visual_backbone_feat_dim = 4352
         mean = torch.tensor([0.4850, 0.4560, 0.4060])[None, :, None, None]
         std = torch.tensor([0.2290, 0.2240, 0.2250])[None, :, None, None]
         self.register_buffer("mean", mean)

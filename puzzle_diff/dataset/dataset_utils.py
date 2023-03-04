@@ -5,7 +5,9 @@ from .nips_dt import Nips_dt
 from .puzzle_dataset import Puzzle_Dataset, Puzzle_Dataset_MP, Puzzle_Dataset_ROT
 from .roc_dt import Roc_dt
 from .sind_dt import Sind_dt
+from .sind_vist_dt import Sind_Vist_dt
 from .text_dataset import Text_dataset
+from .vist_dataset import Vist_dataset
 from .wikiart_dt import Wikiart_DT
 
 ALLOWED_DT = ["celeba", "cifar100", "wikiart"]
@@ -253,3 +255,16 @@ def get_dataset_text(dataset: str):
     test_dt = Text_dataset(test_dt)
 
     return train_dt, val_dt, test_dt
+
+
+def get_dataset_vist(dataset: str):
+    if dataset == "sind":
+        train_dt = Sind_Vist_dt(split="train")
+        test_dt = Sind_Vist_dt(split="test")
+    else:
+        raise Exception(f"Dataset {dataset} is not provided.")
+
+    train_dt = Vist_dataset(train_dt)
+    test_dt = Text_dataset(test_dt)
+
+    return train_dt, None, test_dt

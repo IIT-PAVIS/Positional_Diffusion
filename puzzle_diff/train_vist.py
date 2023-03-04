@@ -87,7 +87,7 @@ def main(
         tags=tags,
     )
 
-    checkpoint_callback = ModelCheckpoint(monitor="pairwise", mode="max", save_top_k=2)
+    checkpoint_callback = ModelCheckpoint(monitor="sp", mode="max", save_top_k=2)
 
     trainer = pl.Trainer(
         accelerator="gpu",

@@ -656,12 +656,11 @@ class GNN_Diffusion(pl.LightningModule):
 
                 sp = scipy.stats.spearmanr(
                     torch.argsort(pos.squeeze().cpu()), torch.arange(len(pos))
-                )
+                )[0]
 
                 self.metrics["sp"].update(sp)
-                pairwise = count_greater_elements(
-                    torch.argsort(pos.squeeze().cpu())
-                ).numpy()
+
+                pairwise = pairwise_acc(torch.argsort(pos.squeeze().cpu()))
 
                 self.metrics["pairwise"].update(pairwise)
 
@@ -932,3 +931,13 @@ def count_greater_elements(x):
         total_comparisons += N - i - 1
     count_norm = count.float() / total_comparisons
     return count_norm
+
+
+def pairwise_acc(story):
+    correct = 0
+    total = len(story) * (len(story) - 1) // 2
+    for idx1 in range(len(story)):
+        for idx2 in range(idx1 + 1, len(story)):
+            if story[idx1] < story[idx2]:
+                correct += 1
+    return correct / total

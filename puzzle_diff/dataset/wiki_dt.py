@@ -13,7 +13,7 @@ class Wiki_dt(Dataset):
     def __init__(self, split="train"):
         super().__init__()
         data_path = Path(f"datasets/wiki/wiki_movie_plots_deduped.csv")
-        split_len = 0.8 if split == "train" else ".2"
+        split_len = 0.8 if split == "train" else 0.2
         rows = load_data(data_path)
         random.Random(SEED).shuffle(rows)
         self.examples = rows[: int(len(rows) * split_len)]

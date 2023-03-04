@@ -33,7 +33,7 @@ class Sind_Vist_dt(Dataset):
     def __init__(self, download=False, split="train"):
         super().__init__()
         data_path = Path(f"datasets/sind/{split}.story-in-sequence.json")
-        images_path = Path(f"datasets/sind/images")
+        images_path = Path(f"/data/vist/images")
         if download:
             download_images(data_path)
         self.examples = load_data(data_path, images_path)
@@ -62,9 +62,11 @@ def load_data(in_file, images_path: Path):
 
     rows = []
     count = 0
+
     for i in range(0, len(annotations), 5):
         line = [annotations[i + d][0]["original_text"] for d in range(5)]
         img_for_line = []
+
         for d in range(5):
             img_path = Path(
                 str(images_path / f"{annotations[i+d][0]['photo_flickr_id']}.jpg")
@@ -75,9 +77,9 @@ def load_data(in_file, images_path: Path):
             img_for_line.append(img_path)
 
         if len(img_for_line) != len(line):
-            break
+            continue
         rows.append((img_for_line, line))
-    breakpoint()
+
     return rows
 
 
@@ -99,10 +101,7 @@ def download_images(in_file):
 
 if __name__ == "__main__":
 
-    dt = Sind_Vist_dt(download=True, split="train")
+    dt = Sind_Vist_dt(download=False, split="test")
     x = dt[100]
-    for i, text in zip(x[0], x[1]):
-        plt.figure()
-        plt.title(text)
-        plt.imshow(i)
-        plt.show()
+
+    print(x)

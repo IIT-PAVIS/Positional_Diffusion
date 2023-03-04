@@ -336,7 +336,6 @@ class GNN_Diffusion(pl.LightningModule):
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
         feats = self.get_features(**cond)
 
-        breakpoint()
         prediction = self.forward_with_feats(
             x_noisy,
             time=t,
@@ -642,7 +641,8 @@ class GNN_Diffusion(pl.LightningModule):
                 pos = img[batch.batch == i]
 
                 self.metrics["overall_nImages"].update(1)
-
+                breakpoint()
+                pair_acc = pairwise_accuracy(pos.squeeze(), np.arange(len(pos)))
                 correct = False
                 if ((pos[1:] - pos[:-1]) > 0).all():
                     correct = True
@@ -901,3 +901,39 @@ def kendall_tau(order, ground_truth):
 
     corr, _ = kendalltau(new_order, list(range(len(order))))
     return corr
+
+
+import torch
+
+
+def pairwise_accuracy(predictions, targets):
+    """
+    Computes pairwise accuracy between predictions and targets.
+
+    Args:
+    - predictions (torch.Tensor): tensor of predicted values of shape (batch_size, num_classes)
+    - targets (torch.Tensor): tensor of true values of shape (batch_size, num_classes)
+
+    Returns:
+    - accuracy (float): pairwise accuracy
+    """
+
+    # Get the number of elements in the batch
+    batch_size = predictions.size(0)
+
+    # Compute the pairwise orderings for predictions and targets
+    pred_orderings = torch.argsort(predictions, dim=1, descending=True)
+    target_orderings = torch.argsort(targets, dim=1, descending=True)
+
+    # Compute the pairwise accuracy
+    num_correct = 0
+    for i in range(batch_size):
+        for j in range(i + 1, batch_size):
+            if (pred_orderings[i] > pred_orderings[j]) == (
+                target_orderings[i] > target_orderings[j]
+            ):
+                num_correct += 1
+
+    accuracy = num_correct / (batch_size * (batch_size - 1) / 2)
+
+    return accuracy

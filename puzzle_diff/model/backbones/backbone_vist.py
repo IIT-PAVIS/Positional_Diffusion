@@ -123,7 +123,7 @@ class Eff_GAT_Vist(nn.Module):
     ):
         time_feats = self.time_emb(time)  # embedding, int -> 32
         pos_feats = self.pos_mlp(xy_pos)  # MLP, (x, y) -> 32
-        breakpoint()
+
         # COMBINE  and transform with MLP
         combined_feats = torch.cat(
             [text_feats, frames_feats, pos_feats, time_feats], -1

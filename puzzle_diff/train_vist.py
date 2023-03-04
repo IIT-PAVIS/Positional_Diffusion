@@ -73,7 +73,7 @@ def main(
 
     franklin = True if gpus > 1 else False
 
-    experiment_name = f"text-{dataset}-{steps}-{get_random_string(6)}"
+    experiment_name = f"VIST-{dataset}-{steps}-{get_random_string(6)}"
 
     tags = [f"{dataset}", "text", "train"]
 

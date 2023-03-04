@@ -97,7 +97,7 @@ def main(
         logger=wandb_logger,
         callbacks=[checkpoint_callback, ModelSummary(max_depth=2)],
     )
-
+    trainer.test(model, dl_test)
     trainer.fit(model, dl_train, dl_test, ckpt_path=checkpoint_path)
 
 

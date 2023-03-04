@@ -764,7 +764,6 @@ class GNN_Diffusion(pl.LightningModule):
                 )
                 pmr = match.all().float()
                 acc = match.float().mean()
-
                 tau = kendall_tau(
                     torch.argsort(pos.squeeze()).cpu().numpy(), np.arange(len(pos))
                 )

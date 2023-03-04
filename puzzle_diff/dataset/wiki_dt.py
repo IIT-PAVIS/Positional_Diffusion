@@ -3,6 +3,9 @@ import random
 from pathlib import Path
 
 import pandas as pd
+import sklearn
+import torch
+from sklearn.model_selection import KFold
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
@@ -10,19 +13,23 @@ SEED = 42
 
 
 class Wiki_dt(Dataset):
-    def __init__(self, split="train"):
+    def __init__(self, split="train", n_splits=5, split_idx=1):
         super().__init__()
         data_path = Path(f"datasets/wiki/wiki_movie_plots_deduped.csv")
-        split_len = 0.8 if split == "train" else 0.2
         rows = load_data(data_path)
-        random.Random(SEED).shuffle(rows)
-        self.examples = rows[: int(len(rows) * split_len)]
+
+        indexes = torch.arange(len(rows))
+        kfold = KFold(n_splits, random_state=SEED, shuffle=True)
+        self.indexes = [x for x in kfold.split(indexes)][split_idx][
+            0 if split == "train" else 1
+        ]
+        self.examples = rows
 
     def __len__(self):
-        return len(self.examples)
+        return len(self.indexes)
 
     def __getitem__(self, idx):
-        return self.examples[idx]
+        return self.examples[self.indexes[idx]]
 
 
 ### Reordering task

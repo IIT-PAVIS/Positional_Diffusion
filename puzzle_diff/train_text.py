@@ -38,10 +38,11 @@ def main(
     offline,
     checkpoint_path,
     predict_xstart,
+    cv_split,
 ):
     ### Define dataset
 
-    train_dt, val_dt, test_dt = get_dataset_text(dataset=dataset)
+    train_dt, val_dt, test_dt = get_dataset_text(dataset=dataset, cv_split=cv_split)
 
     dl_train = torch_geometric.loader.DataLoader(
         train_dt, batch_size=batch_size, num_workers=num_workers, shuffle=True
@@ -116,6 +117,7 @@ if __name__ == "__main__":
     ap.add_argument("--data_augmentation", type=str, default="none")
     ap.add_argument("--checkpoint_path", type=str, default="")
     ap.add_argument("--predict_xstart", type=bool, default=True)
+    ap.add_argument("--cv_split", type=int, default=1)
 
     args = ap.parse_args()
     print(args)
@@ -130,4 +132,5 @@ if __name__ == "__main__":
         offline=args.offline,
         checkpoint_path=args.checkpoint_path,
         predict_xstart=args.predict_xstart,
+        cv_split=args.cv_split,
     )

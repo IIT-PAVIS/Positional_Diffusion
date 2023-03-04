@@ -233,7 +233,7 @@ def get_dataset_old(
     return (puzzleDt_train, puzzleDt_test, real_puzzle_sizes)
 
 
-def get_dataset_text(dataset: str):
+def get_dataset_text(dataset: str, cv_split):
     assert dataset in ALLOWED_TEXT
 
     if dataset == "nips":
@@ -249,9 +249,9 @@ def get_dataset_text(dataset: str):
         val_dt = Roc_dt(split="test")
         test_dt = Roc_dt(split="test")
     elif dataset == "wiki":
-        train_dt = Wiki_dt(split="train")
-        val_dt = Wiki_dt(split="test")
-        test_dt = Wiki_dt(split="test")
+        train_dt = Wiki_dt(split="train", split_idx=cv_split)
+        val_dt = Wiki_dt(split="test", split_idx=cv_split)
+        test_dt = Wiki_dt(split="test", split_idx=cv_split)
     else:
         raise Exception(f"Dataset {dataset} is not provided.")
 

@@ -34,7 +34,10 @@ def load_data(in_file):
     """
 
     df = pd.read_csv(in_file)
-    rows = [[l for l in x.split(".")[:20] if len(l) > 1] for x in df["Plot"]]
+    rows = [
+        [l for l in x.split(".")[:20] if len(l) > 5 and len(x.split(".")) > 1]
+        for x in df["Plot"]
+    ]
 
     return rows
 

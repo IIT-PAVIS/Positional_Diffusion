@@ -270,6 +270,6 @@ def get_dataset_vist(dataset: str):
         raise Exception(f"Dataset {dataset} is not provided.")
 
     train_dt = Vist_dataset(train_dt)
-    test_dt = Text_dataset(test_dt)
+    test_dt = Vist_dataset(test_dt)
 
     return train_dt, None, test_dt

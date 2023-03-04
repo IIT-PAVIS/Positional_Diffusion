@@ -281,7 +281,7 @@ class GNN_Diffusion(pl.LightningModule):
         # for i in n_patches:
         #     metrics[f"{i}_acc"] = torchmetrics.MeanMetric()
         #     metrics[f"{i}_nImages"] = torchmetrics.SumMetric()
-        metrics["accuracy"] = torchmetrics.MeanMetric()
+        metrics["sp"] = torchmetrics.MeanMetric()
         metrics["tau"] = torchmetrics.MeanMetric()
         metrics["pmr"] = torchmetrics.MeanMetric()
         metrics["overall_nImages"] = torchmetrics.SumMetric()
@@ -425,7 +425,7 @@ class GNN_Diffusion(pl.LightningModule):
 
     @torch.no_grad()
     def p_sample_ddim(
-        self, x, t, t_index, cond, edge_index, patch_feats, batch
+        self, x, t, t_index, cond, edge_index, text_feats, frames_feats, batch
     ):  # (self, x, t, t_index, cond):
         # if t[0] == 0:
         #     return x
@@ -445,7 +445,12 @@ class GNN_Diffusion(pl.LightningModule):
 
         if self.classifier_free_prob > 0.0:
             model_output_cond = self.forward_with_feats(
-                x, t, cond, edge_index, patch_feats=patch_feats, batch=batch
+                x,
+                t,
+                edge_index=edge_index,
+                text_feats=text_feats,
+                frames_feats=frames_feats,
+                batch=batch,
             )
 
             model_output_uncond = self.forward_with_feats(
@@ -461,7 +466,12 @@ class GNN_Diffusion(pl.LightningModule):
             ) * model_output_cond - self.classifier_free_w * model_output_uncond
         else:
             model_output = self.forward_with_feats(
-                x, t, cond, edge_index, patch_feats=patch_feats, batch=batch
+                x,
+                t,
+                edge_index=edge_index,
+                text_feats=text_feats,
+                frames_feats=frames_feats,
+                batch=batch,
             )
 
         # estimate x_0
@@ -502,21 +512,12 @@ class GNN_Diffusion(pl.LightningModule):
         device = self.device
 
         b = shape[0]
-        # start from pure noise (for each example in the batch)
+
         img = torch.randn(shape, device=device) * self.noise_weight
-        # img = einops.rearrange(
-        #     img,
-        #     "b c (w1 w) (h1 h) -> b (w1 h1) c w h",
-        #     h1=self.patches,
-        #     w1=self.patches,
-        # )
+
         imgs = []
 
-        patch_feats = self.visual_features(cond)
-
-        # time_t = torch.full((b,), i, device=device, dtype=torch.long)
-
-        # time_t = torch.full((b,), 0, device=device, dtype=torch.long)
+        feats = self.get_features(**cond)
 
         for i in tqdm(
             list(reversed(range(0, self.steps, self.inference_ratio))),
@@ -529,7 +530,7 @@ class GNN_Diffusion(pl.LightningModule):
                 i,
                 cond=cond,
                 edge_index=edge_index,
-                patch_feats=patch_feats,
+                **feats,
                 batch=batch,
             )
             # uncomment to rotate images during sampling
@@ -555,9 +556,20 @@ class GNN_Diffusion(pl.LightningModule):
 
     @torch.no_grad()
     def p_sample(
-        self, x, t, t_index, cond, edge_index, sampling_func, patch_feats, batch
+        self,
+        x,
+        t,
+        t_index,
+        cond,
+        edge_index,
+        sampling_func,
+        frames_feats,
+        text_feats,
+        batch,
     ):
-        return sampling_func(x, t, t_index, cond, edge_index, patch_feats, batch)
+        return sampling_func(
+            x, t, t_index, cond, edge_index, text_feats, frames_feats, batch
+        )
 
     @torch.no_grad()
     def sample(
@@ -633,33 +645,24 @@ class GNN_Diffusion(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         with torch.no_grad():
+
             imgs = self.p_sample_loop(
-                batch.x.shape, batch.phrases_text, batch.edge_index, batch=batch.batch
+                batch.x.shape,
+                cond={"sentences": batch.phrases_text, "frames": batch.frames},
+                edge_index=batch.edge_index,
+                batch=batch.batch,
             )
             img = imgs[-1]
             for i in range(batch.batch.max() + 1):
                 pos = img[batch.batch == i]
 
                 self.metrics["overall_nImages"].update(1)
-                breakpoint()
-                pair_acc = pairwise_accuracy(pos.squeeze(), np.arange(len(pos)))
-                correct = False
-                if ((pos[1:] - pos[:-1]) > 0).all():
-                    correct = True
 
-                match = torch.argsort(pos.squeeze()) == torch.arange(len(pos)).to(
-                    batch.x.device
-                )
-                pmr = match.all().float()
-                acc = match.float().mean()
-
-                tau = kendall_tau(
-                    torch.argsort(pos.squeeze()).cpu().numpy(), np.arange(len(pos))
+                sp = scipy.stats.spearmanr(
+                    torch.argsort(pos.squeeze().cpu()), torch.arange(len(pos))
                 )
 
-                self.metrics["accuracy"].update(acc)
-                self.metrics["tau"].update(tau)
-                self.metrics["pmr"].update(pmr)
+                self.metrics["sp"].update(sp)
             self.log_dict(self.metrics)
 
     def validation_epoch_end(self, outputs) -> None:

@@ -43,7 +43,10 @@ class Sind_Vist_dt(Dataset):
 
     def __getitem__(self, idx):
         images_paths, sentences = self.examples[idx]
-        images = [Image.open(img_path) for img_path in images_paths]
+        images = [
+            Image.open(img_path).resize((32, 32)).convert(mode="RGB")
+            for img_path in images_paths
+        ]
         return images, sentences
 
 

@@ -284,6 +284,9 @@ class GNN_Diffusion(pl.LightningModule):
         metrics["pairwise"] = torchmetrics.MeanMetric()
         metrics["hamming"] = torchmetrics.MeanMetric()
         metrics["distance"] = torchmetrics.MeanMetric()
+        metrics["accuracy"] = torchmetrics.MeanMetric()
+        metrics["tau"] = torchmetrics.MeanMetric()
+        metrics["pmr"] = torchmetrics.MeanMetric()
         self.metrics = nn.ModuleDict(metrics)
 
     def forward(self, xy_pos, time, sentences, frames, edge_index, batch) -> Any:
@@ -331,8 +334,10 @@ class GNN_Diffusion(pl.LightningModule):
     ):
         if noise is None:
             noise = torch.randn_like(x_start)
-
-        x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
+        if self.steps == 1:
+            x_noisy = torch.zeros_like(x_start)
+        else:
+            x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
 
         feats = self.get_features(**cond)
 
@@ -674,6 +679,19 @@ class GNN_Diffusion(pl.LightningModule):
                 abs_dist = absolute_distance(pos.squeeze().cpu().numpy())
                 self.metrics["distance"].update(abs_dist)
 
+                match = torch.argsort(pos.squeeze()) == torch.arange(len(pos)).to(
+                    batch.x.device
+                )
+                pmr = match.all().float()
+                acc = match.float().mean()
+                tau = kendall_tau(
+                    torch.argsort(pos.squeeze()).cpu().numpy(), np.arange(len(pos))
+                )
+
+                self.metrics["accuracy"].update(acc)
+                self.metrics["tau"].update(tau)
+                self.metrics["pmr"].update(pmr)
+
             self.log_dict(self.metrics)
 
     def validation_epoch_end(self, outputs) -> None:
@@ -950,3 +968,33 @@ def pairwise_acc(story):
 
 def absolute_distance(story):
     return np.mean(np.abs(np.array(story) - np.array([0, 1, 2, 3, 4])))
+
+
+def kendall_tau(order, ground_truth):
+    """
+    Computes the kendall's tau metric
+    between the predicted sentence order and true order
+    Input:
+            order: list of ints denoting the predicted output order
+            ground_truth: list of ints denoting the true sentence order
+
+    Returns:
+            kendall's tau - float
+    """
+
+    if len(ground_truth) == 1:
+        if ground_truth[0] == order[0]:
+            return 1.0
+
+    reorder_dict = {}
+
+    for i in range(len(ground_truth)):
+        reorder_dict[ground_truth[i]] = i
+
+    new_order = [0] * len(order)
+    for i in range(len(new_order)):
+        if order[i] in reorder_dict.keys():
+            new_order[i] = reorder_dict[order[i]]
+
+    corr, _ = kendalltau(new_order, list(range(len(order))))
+    return corr

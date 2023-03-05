@@ -394,7 +394,10 @@ class GNN_Diffusion(pl.LightningModule):
         if noise is None:
             noise = torch.randn_like(x_start)
 
-        x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
+        if self.steps == 1:
+            x_noisy = torch.zeros_like(x_start)
+        else:
+            x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
         # rotation of middle images doesn't work
         # if self.rotation:
         #     cond = rotate_images(cond, x_noisy[:, -2:])

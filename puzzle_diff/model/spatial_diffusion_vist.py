@@ -201,7 +201,7 @@ class GNN_Diffusion(pl.LightningModule):
         model_mean_type: ModelMeanType = ModelMeanType.EPSILON,
         warmup_steps=1000,
         max_train_steps=10000,
-        finetune=True,
+        finetune=False,
         *args,
         **kwargs,
     ) -> None:

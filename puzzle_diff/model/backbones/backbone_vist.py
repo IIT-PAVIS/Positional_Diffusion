@@ -18,7 +18,12 @@ class Eff_GAT_Vist(nn.Module):
     """
 
     def __init__(
-        self, steps, input_channels=1, output_channels=1, model="facebook/bart-large"
+        self,
+        steps,
+        input_channels=1,
+        output_channels=1,
+        model="facebook/bart-large",
+        finetune=False,
     ) -> None:
         super().__init__()
 
@@ -28,7 +33,7 @@ class Eff_GAT_Vist(nn.Module):
         self.tokenizer = BartTokenizer.from_pretrained(model)
         self.text_encoder = BartModel.from_pretrained(model)
         self.text_encoder.return_dict = True
-
+        self.finetune = finetune
         self.trans_features_dim = {
             "facebook/bart-base": 768,
             "facebook/bart-large": 1024,
@@ -52,7 +57,7 @@ class Eff_GAT_Vist(nn.Module):
         self.visual_backbone = timm.create_model(
             "efficientnet_b0", pretrained=True, features_only=True
         )
-        visual_backbone_feat_dim = 4352 + 13056  # 128x128
+        visual_backbone_feat_dim = 4352  # + 13056  # 128x128
         mean = torch.tensor([0.4850, 0.4560, 0.4060])[None, :, None, None]
         std = torch.tensor([0.2290, 0.2240, 0.2250])[None, :, None, None]
         self.register_buffer("mean", mean)
@@ -141,12 +146,19 @@ class Eff_GAT_Vist(nn.Module):
         return final_feats
 
     def text_features(self, patch_rgb):
-        with torch.no_grad():
+        if self.finetune:
             phrases = [y for x in patch_rgb for y in x]
             tokens = self.tokenizer(phrases, return_tensors="pt", padding=True).to(
                 self.text_encoder.device
             )
             text_emb = self.text_encoder(**tokens)["last_hidden_state"]
+        else:
+            with torch.no_grad():
+                phrases = [y for x in patch_rgb for y in x]
+                tokens = self.tokenizer(phrases, return_tensors="pt", padding=True).to(
+                    self.text_encoder.device
+                )
+                text_emb = self.text_encoder(**tokens)["last_hidden_state"]
 
         attn_mask = (1 - tokens["attention_mask"]).bool()
         feats = self.transformer_encode(text_emb, src_key_padding_mask=attn_mask)

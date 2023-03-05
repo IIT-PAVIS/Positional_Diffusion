@@ -201,7 +201,7 @@ class GNN_Diffusion(pl.LightningModule):
         model_mean_type: ModelMeanType = ModelMeanType.EPSILON,
         warmup_steps=1000,
         max_train_steps=10000,
-        correct_positions=False,
+        finetune=True,
         *args,
         **kwargs,
     ) -> None:
@@ -213,7 +213,7 @@ class GNN_Diffusion(pl.LightningModule):
         self.classifier_free_w = classifier_free_w
         self.noise_weight = noise_weight
         self.rotation = rotation
-
+        self.finetune = finetune
         self.warmup_steps = warmup_steps
         self.max_train_steps = max_train_steps
         ### DIFFUSION STUFF
@@ -273,7 +273,9 @@ class GNN_Diffusion(pl.LightningModule):
         self.steps = steps
 
         ### BACKBONE
-        self.model = Eff_GAT_Vist(steps=steps, input_channels=1, output_channels=1)
+        self.model = Eff_GAT_Vist(
+            steps=steps, input_channels=1, output_channels=1, finetune=finetune
+        )
         self.initialize_torchmetrics()
         self.save_hyperparameters()
 

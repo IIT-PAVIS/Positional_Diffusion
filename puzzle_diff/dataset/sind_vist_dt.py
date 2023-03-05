@@ -45,7 +45,10 @@ class Sind_Vist_dt(Dataset):
 
     def __getitem__(self, idx):
         images_paths, sentences = self.examples[idx]
-        images = [Image.open(img_path) for img_path in images_paths]
+        images = [
+            Image.open(img_path).resize((64, 64)).convert("RGB")
+            for img_path in images_paths
+        ]
         return images, sentences
 
 
@@ -108,7 +111,7 @@ def resize_data(in_file, images_path: Path):
             return
 
         try:
-            img = Image.open(img_path).resize((64, 64)).convert("RGB")
+            img = Image.open(img_path).resize((128, 128)).convert("RGB")
             img.save(f"/data/dst/{img_path.name}")
         except:
             return

@@ -44,9 +44,7 @@ class Vist_dataset(pyg_data.Dataset):
     def get(self, idx):
         images, phrases = self.dataset_get_fn(self.dataset[idx])
 
-        frames = torch.cat(
-            [self.transforms(img.resize((128, 128)))[None, :] for img in images]
-        )
+        frames = torch.cat([self.transforms(img)[None, :] for img in images])
         x = torch.linspace(-1, 1, len(phrases))
 
         adj_mat = torch.ones(len(phrases), len(phrases))

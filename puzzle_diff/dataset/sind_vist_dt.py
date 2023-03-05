@@ -6,6 +6,7 @@ import pickle
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+import matplotlib
 import requests
 from matplotlib import pyplot as plt
 from PIL import Image
@@ -33,7 +34,7 @@ class Sind_Vist_dt(Dataset):
     def __init__(self, download=False, split="train"):
         super().__init__()
         data_path = Path(f"datasets/sind/{split}.story-in-sequence.json")
-        images_path = Path(f"/data/dst")
+        images_path = Path(f"/data/vist/images")
         if download:
             download_images(data_path)
 
@@ -148,5 +149,9 @@ if __name__ == "__main__":
 
     dt = Sind_Vist_dt(download=False, split="train")
     x = dt[100]
+    for img in x[0]:
+        plt.figure()
+        plt.imshow(img)
+        plt.show()
 
     print(x)

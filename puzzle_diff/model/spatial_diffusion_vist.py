@@ -333,6 +333,7 @@ class GNN_Diffusion(pl.LightningModule):
             noise = torch.randn_like(x_start)
 
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
+
         feats = self.get_features(**cond)
 
         prediction = self.forward_with_feats(

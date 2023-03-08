@@ -76,7 +76,7 @@ def main(
         classifier_free_prob=classifier_free_prob,
         noise_weight=noise_weight,
         rotation=rotation,
-        model_mean_type=sd.ModelMeanType.EPISLON
+        model_mean_type=sd.ModelMeanType.EPSILON
         if not predict_xstart
         else sd.ModelMeanType.START_X,
     )

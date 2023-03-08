@@ -274,8 +274,10 @@ class GNN_Diffusion(pl.LightningModule):
 
         for i in n_patches:
             metrics[f"{i}_acc"] = torchmetrics.MeanMetric()
+            metrics[f"{i}__piece_acc"] = torchmetrics.MeanMetric()
             metrics[f"{i}_nImages"] = torchmetrics.SumMetric()
         metrics["overall_acc"] = torchmetrics.MeanMetric()
+        metrics["overall__piece_acc"] = torchmetrics.MeanMetric()
         metrics["overall_nImages"] = torchmetrics.SumMetric()
         self.metrics = nn.ModuleDict(metrics)
 
@@ -736,6 +738,8 @@ class GNN_Diffusion(pl.LightningModule):
                 pred_ass = pred_ass[sort_idx]
 
                 correct = (gt_ass[:, 1] == pred_ass[:, 1]).all()
+
+                piece_accuracy = gt_ass[:, 1] == pred_ass[:, 1]
                 if self.rotation:
                     pred_rot = img[idx, 2:]
                     gt_rot = batch.x[idx, 2:]
@@ -781,6 +785,7 @@ class GNN_Diffusion(pl.LightningModule):
 
                 self.metrics[f"{tuple(n_patches)}_nImages"].update(1)
                 self.metrics["overall_nImages"].update(1)
+                self.metrics[f"{tuple(n_patches)}__piece_acc"].update(piece_accuracy)
                 if correct:
                     # if (assignement[:, 0] == assignement[:, 1]).all():
                     self.metrics[f"{tuple(n_patches)}_acc"].update(1)

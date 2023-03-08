@@ -739,7 +739,7 @@ class GNN_Diffusion(pl.LightningModule):
 
                 correct = (gt_ass[:, 1] == pred_ass[:, 1]).all()
 
-                piece_accuracy = gt_ass[:, 1] == pred_ass[:, 1]
+                piece_accuracy = (gt_ass[:, 1] == pred_ass[:, 1]).to(self.device)
                 if self.rotation:
                     pred_rot = img[idx, 2:]
                     gt_rot = batch.x[idx, 2:]

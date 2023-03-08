@@ -44,6 +44,7 @@ def main(
     checkpoint_path,
     rotation,
     predict_xstart,
+    evaluate,
 ):
     ### Define dataset
 
@@ -114,8 +115,13 @@ def main(
         logger=wandb_logger,
         callbacks=[checkpoint_callback, ModelSummary(max_depth=2)],
     )
-
-    trainer.fit(model, dl_train, dl_test, ckpt_path=checkpoint_path)
+    if evaluate:
+        model = sd.GNN_Diffusion.load_from_checkpoint(checkpoint_path)
+        model.initialize_torchmetrics(puzzle_sizes)
+        model.noise_weight = noise_weight
+        trainer.test(model, dl_test)
+    else:
+        trainer.fit(model, dl_train, dl_test, ckpt_path=checkpoint_path)
 
 
 if __name__ == "__main__":
@@ -142,6 +148,7 @@ if __name__ == "__main__":
     ap.add_argument("--noise_weight", type=float, default=0.0)
     ap.add_argument("--predict_xstart", type=bool, default=False)
     ap.add_argument("--rotation", type=bool, default=False)
+    ap.add_argument("--evaluate", type=bool, default=False)
 
     args = ap.parse_args()
     print(args)
@@ -162,4 +169,5 @@ if __name__ == "__main__":
         checkpoint_path=args.checkpoint_path,
         rotation=args.rotation,
         predict_xstart=args.predict_xstart,
+        evaluate=args.evaluate,
     )

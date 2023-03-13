@@ -1,6 +1,7 @@
 import colorsys
 import enum
 import math
+import pickle
 
 # from .backbones.Transformer_GNN import Transformer_GNN
 from collections import defaultdict
@@ -660,9 +661,25 @@ class GNN_Diffusion(pl.LightningModule):
                 batch=batch.batch,
             )
             img = imgs[-1]
-            for i in range(batch.batch.max() + 1):
-                pos = img[batch.batch == i]
 
+            for i in range(batch.batch.max() + 1):
+                file_path = Path(f"results/{self.logger.experiment.name}/vals/")
+                breakpoint()
+                file_path.mkdir(parents=True, exist_ok=True)
+
+                pos = img[batch.batch == i]
+                with open(file_path / f"{i}.pkl", "wb") as fp:
+                    pickle.dump(
+                        {
+                            "pos": [
+                                imgs[n][batch.batch == i].cpu()
+                                for n in range(len(imgs))
+                            ],
+                            "images": batch.frames[i],
+                            "sentences": batch.phrases_text[i],
+                        },
+                        fp,
+                    )
                 sp = scipy.stats.spearmanr(
                     torch.argsort(pos.squeeze().cpu()), torch.arange(len(pos))
                 )[0]

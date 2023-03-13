@@ -178,7 +178,4 @@ class Eff_GAT_Vist(nn.Module):
             -1,
         )
 
-        # patch_feats = self.visual_backbone.forward(patch_rgb)[3].reshape(
-        # patch_rgb.shape[0], -1
-        # )
         return patch_feats

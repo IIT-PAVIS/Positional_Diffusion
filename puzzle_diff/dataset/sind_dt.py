@@ -13,7 +13,7 @@ def download_img(image_url):
     req = requests.get(image_url)
     id_jpg = image_url.split("/")[-1]
     img_data = req.content
-    with open(f"/data/sind/images/{id_jpg}", "wb") as handler:
+    with open(f"/data/sind_large/{id_jpg}", "wb") as handler:
         handler.write(img_data)
 
 

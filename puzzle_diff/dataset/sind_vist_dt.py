@@ -18,7 +18,7 @@ from tqdm.contrib.concurrent import thread_map  # or thread_map
 def download_img(image_url):
 
     id_jpg = image_url.split("/")[-1].split("_")[0] + ".jpg"
-    img_path = Path(f"/data/vist/images/{id_jpg}")
+    img_path = Path(f"/data/vist_large/{id_jpg}")
     if img_path.exists():
         return
     req = requests.get(image_url)
@@ -46,10 +46,10 @@ class Sind_Vist_dt(Dataset):
     def __getitem__(self, idx):
         images_paths, sentences = self.examples[idx]
         images = [
-            Image.open(img_path)  # .resize((64, 64)).convert("RGB")
+            Image.open(img_path).convert("RGB").resize((64, 64))
             for img_path in images_paths
         ]
-        return images, sentences
+        return images, sentences, images_paths
 
 
 ### Reordering task
@@ -150,7 +150,7 @@ def download_images(in_file):
 
 if __name__ == "__main__":
 
-    dt = Sind_Vist_dt(download=False, split="train")
+    dt = Sind_Vist_dt(download=True, split="test")
     x = dt[100]
     for img in x[0]:
         plt.figure()

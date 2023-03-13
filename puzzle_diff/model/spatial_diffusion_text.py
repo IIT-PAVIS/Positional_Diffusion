@@ -1,6 +1,7 @@
 import colorsys
 import enum
 import math
+import pickle
 
 # from .backbones.Transformer_GNN import Transformer_GNN
 from collections import defaultdict
@@ -626,7 +627,7 @@ class GNN_Diffusion(pl.LightningModule):
             #         w1=self.patches,
             #     )
             #     imgs.append(img2.cpu().numpy())
-        imgs.append(img)
+            imgs.append(img)
         return imgs
 
     @torch.no_grad()
@@ -752,9 +753,33 @@ class GNN_Diffusion(pl.LightningModule):
             imgs = self.p_sample_loop(
                 batch.x.shape, batch.phrases_text, batch.edge_index, batch=batch.batch
             )
+
             img = imgs[-1]
+            n = 0
+
             for i in range(batch.batch.max() + 1):
                 pos = img[batch.batch == i]
+                # Saving entire diff process
+                print(f"{self.logger.experiment.name}")
+                file_path = Path(f"results/{self.logger.experiment.name}/vals/")
+
+                file_path.mkdir(parents=True, exist_ok=True)
+
+                with open(
+                    file_path / f"{batch_idx * len(batch.num_phrases) + n}.pkl", "wb"
+                ) as fp:
+
+                    pickle.dump(
+                        {
+                            "pos": [
+                                imgs[n][batch.batch == i].cpu()
+                                for n in range(len(imgs))
+                            ],
+                            "sentences": batch.phrases_text[i],
+                        },
+                        fp,
+                    )
+                n += 1
 
                 self.metrics["overall_nImages"].update(1)
 

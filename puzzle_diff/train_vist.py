@@ -98,7 +98,7 @@ def main(
         num_sanity_val_steps=2,
         callbacks=[checkpoint_callback, ModelSummary(max_depth=2)],
     )
-
+    trainer.test(model, dl_test, ckpt_path=checkpoint_path)
     trainer.fit(model, dl_train, dl_test, ckpt_path=checkpoint_path)
 
 

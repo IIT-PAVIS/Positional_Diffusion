@@ -29,6 +29,7 @@ class Vist_dataset(pyg_data.Dataset):
         assert dataset is not None and dataset_get_fn is not None
         self.dataset = dataset
         self.dataset_get_fn = dataset_get_fn
+
         self.transforms = transforms.Compose(
             [
                 transforms.ToTensor(),
@@ -42,7 +43,7 @@ class Vist_dataset(pyg_data.Dataset):
             raise Exception("Dataset not provided")
 
     def get(self, idx):
-        images, phrases = self.dataset_get_fn(self.dataset[idx])
+        images, phrases, img_path = self.dataset_get_fn(self.dataset[idx])
 
         frames = torch.cat([self.transforms(img)[None, :] for img in images])
         x = torch.linspace(-1, 1, len(phrases))
@@ -55,6 +56,7 @@ class Vist_dataset(pyg_data.Dataset):
             frames=frames,
             phrases_text=phrases,
             edge_index=edge_index,
+            img_path=img_path,
             ind_name=torch.tensor([idx]).long(),
             num_phrases=torch.tensor([len(phrases)]),
         )

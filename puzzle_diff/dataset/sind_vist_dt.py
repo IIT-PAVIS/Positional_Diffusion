@@ -34,7 +34,7 @@ class Sind_Vist_dt(Dataset):
     def __init__(self, download=False, split="train"):
         super().__init__()
         data_path = Path(f"datasets/sind/{split}.story-in-sequence.json")
-        images_path = Path(f"/data/dst")
+        images_path = Path(f"/data/vist/images")
         if download:
             download_images(data_path)
 

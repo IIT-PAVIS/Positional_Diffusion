@@ -1,5 +1,6 @@
 import colorsys
 import enum
+import logging
 import math
 import pickle
 
@@ -523,7 +524,7 @@ class GNN_Diffusion(pl.LightningModule):
 
         img = torch.randn(shape, device=device) * self.noise_weight
 
-        imgs = []
+        imgs = [img]
 
         feats = self.get_features(**cond)
 
@@ -559,7 +560,7 @@ class GNN_Diffusion(pl.LightningModule):
             #         w1=self.patches,
             #     )
             #     imgs.append(img2.cpu().numpy())
-        imgs.append(img)
+            imgs.append(img)
         return imgs
 
     @torch.no_grad()
@@ -651,6 +652,9 @@ class GNN_Diffusion(pl.LightningModule):
 
         return loss
 
+    def on_validation_epoch_start(self):
+        logging.info(f"Saving to results/{self.logger.experiment.name}/vals/")
+
     def validation_step(self, batch, batch_idx):
         with torch.no_grad():
 
@@ -661,14 +665,17 @@ class GNN_Diffusion(pl.LightningModule):
                 batch=batch.batch,
             )
             img = imgs[-1]
-
+            n = 0
             for i in range(batch.batch.max() + 1):
                 file_path = Path(f"results/{self.logger.experiment.name}/vals/")
-                breakpoint()
+
                 file_path.mkdir(parents=True, exist_ok=True)
 
                 pos = img[batch.batch == i]
-                with open(file_path / f"{i}.pkl", "wb") as fp:
+
+                with open(
+                    file_path / f"{n * batch_idx * len(batch.phrases_text)}.pkl", "wb"
+                ) as fp:
                     pickle.dump(
                         {
                             "pos": [
@@ -677,9 +684,13 @@ class GNN_Diffusion(pl.LightningModule):
                             ],
                             "images": batch.frames[i],
                             "sentences": batch.phrases_text[i],
+                            "orig_images": [
+                                Image.open(path) for path in batch.img_path[i]
+                            ],
                         },
                         fp,
                     )
+                n += 1
                 sp = scipy.stats.spearmanr(
                     torch.argsort(pos.squeeze().cpu()), torch.arange(len(pos))
                 )[0]

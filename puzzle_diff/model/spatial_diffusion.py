@@ -577,7 +577,7 @@ class GNN_Diffusion(pl.LightningModule):
         #     h1=self.patches,
         #     w1=self.patches,
         # )
-        imgs = []
+        imgs = [img]
 
         patch_feats = self.visual_features(cond)
 
@@ -708,6 +708,13 @@ class GNN_Diffusion(pl.LightningModule):
         self.log("loss", loss)
 
         return loss
+
+    @torch.no_grad()
+    def prediction_step(self, batch, batch_idx):
+        indexes = self.p_sample_loop(
+            batch.x.shape, batch.patches, batch.edge_index, batch=batch.batch
+        )
+        return indexes
 
     def validation_step(self, batch, batch_idx):
         with torch.no_grad():

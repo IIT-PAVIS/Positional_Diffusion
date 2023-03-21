@@ -1,4 +1,4 @@
-name: diffPYG_sing
+name: positional_diffusion
 channels:
   - pytorch
   - conda-forge
